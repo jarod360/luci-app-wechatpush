@@ -1,10 +1,10 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-wechatpush
-PKG_VERSION:=3.6.13
-PKG_RELEASE:=
+PKG_VERSION:=3.6.14
+PKG_RELEASE:=1
 
-PKG_MAINTAINER:=tty228 <tty228@yeah.net>
+LUCI_MAINTAINER:=tty228 <tty228@yeah.net>
 PKG_CONFIG_DEPENDS:= \
         CONFIG_PACKAGE_$(PKG_NAME)_Enable_Traffic_Monitoring \
         CONFIG_PACKAGE_$(PKG_NAME)_Enable_Local_Disk_Information_Detection \
@@ -28,7 +28,7 @@ config PACKAGE_$(PKG_NAME)_Enable_Traffic_Monitoring
         select PACKAGE_wrtbwmon
         depends on PACKAGE_$(PKG_NAME)
         default n
-config PACKAGE_$(PKG_NAME)_Local_Disk_Information_Detection
+config PACKAGE_$(PKG_NAME)_Enable_Local_Disk_Information_Detection
         bool "Local Disk Information Detection"
         help
                 If the lsblk package is not installed, the total disk capacity information might be inconsistent with actual values. When smartctl is not installed, information about disk temperature, power-on time, health status, and more will be unavailable. If you are using a virtual machine or have not installed a physical disk, this feature is typically unnecessary.
@@ -37,7 +37,7 @@ config PACKAGE_$(PKG_NAME)_Local_Disk_Information_Detection
         select PACKAGE_smartmontools-drivedb
         depends on PACKAGE_$(PKG_NAME)
         default n
-config PACKAGE_$(PKG_NAME)_Host_Information_Detection
+config PACKAGE_$(PKG_NAME)_Enable_Host_Information_Detection
         bool "Host Information Detection"
         help
                 When using a virtual machine and requiring information about the host machine's temperature and disk details, you need to install openssh-client and openssh-keygen for SSH connections.
