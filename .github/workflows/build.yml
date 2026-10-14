@@ -315,17 +315,208 @@ jobs:
           control="$tmp_dir/control/control"
           postinst="$tmp_dir/control/postinst"
           postinst_pkg="$tmp_dir/control/postinst-pkg"
+          prerm="$tmp_dir/control/prerm"
+          prerm_pkg="$tmp_dir/control/prerm-pkg"
+          conffiles="$tmp_dir/control/conffiles"
           data="$tmp_dir/data"
 
           grep -q '^Package: luci-app-wechatpush$' "$control"
-          grep -q '^Version: 3.6.14' "$control"
-          grep -q '^Architecture: all$' "$control"
+          grep -q '^Version: 3.6.14-2
+          for required_file in \
+            usr/share/luci/menu.d/luci-app-wechatpush.json \
+            usr/share/rpcd/acl.d/luci-app-wechatpush.json \
+            etc/config/wechatpush \
+            etc/init.d/wechatpush \
+            etc/uci-defaults/luci-wechatpush \
+            usr/share/wechatpush/wechatpush \
+            usr/libexec/wechatpush-call
+          do
+            if [ ! -s "$data/$required_file" ]; then
+              echo "::error::Missing or empty IPK file: $required_file"
+              exit 1
+            fi
+          done
+
+          python3 - "$data/usr/share/luci/menu.d/luci-app-wechatpush.json" "$data/usr/share/rpcd/acl.d/luci-app-wechatpush.json" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as f:
+              menu = json.load(f)
+          with open(sys.argv[2], encoding="utf-8") as f:
+              acl = json.load(f)
+
+          assert "admin/services/wechatpush" in menu, "LuCI menu entry is missing"
+          assert "luci-app-wechatpush" in acl, "rpcd ACL group is missing"
+          for page in ("config", "advanced", "client", "log"):
+              assert f"admin/services/wechatpush/{page}" in menu, f"Menu page {page} is missing"
+          print("IPK metadata, install hooks, menu JSON, ACL JSON and required files verified.")
+          PY
+
+      - name: Upload .ipk artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PACKAGE_NAME }}-ipk-${{ matrix.target.name }}
+          path: ${{ env.SDK_DIR }}/${{ steps.find_ipk.outputs.path }}
+          if-no-files-found: error
+
+  release:
+    name: Publish Release
+    runs-on: ubuntu-latest
+    needs: [build-apk, build-ipk]
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: release-assets/**/*
+ "$control"
+          grep -q '^Section: luci
+          for required_file in \
+            usr/share/luci/menu.d/luci-app-wechatpush.json \
+            usr/share/rpcd/acl.d/luci-app-wechatpush.json \
+            etc/config/wechatpush \
+            etc/init.d/wechatpush \
+            etc/uci-defaults/luci-wechatpush \
+            usr/share/wechatpush/wechatpush \
+            usr/libexec/wechatpush-call
+          do
+            if [ ! -s "$data/$required_file" ]; then
+              echo "::error::Missing or empty IPK file: $required_file"
+              exit 1
+            fi
+          done
+
+          python3 - "$data/usr/share/luci/menu.d/luci-app-wechatpush.json" "$data/usr/share/rpcd/acl.d/luci-app-wechatpush.json" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as f:
+              menu = json.load(f)
+          with open(sys.argv[2], encoding="utf-8") as f:
+              acl = json.load(f)
+
+          assert "admin/services/wechatpush" in menu, "LuCI menu entry is missing"
+          assert "luci-app-wechatpush" in acl, "rpcd ACL group is missing"
+          for page in ("config", "advanced", "client", "log"):
+              assert f"admin/services/wechatpush/{page}" in menu, f"Menu page {page} is missing"
+          print("IPK metadata, install hooks, menu JSON, ACL JSON and required files verified.")
+          PY
+
+      - name: Upload .ipk artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PACKAGE_NAME }}-ipk-${{ matrix.target.name }}
+          path: ${{ env.SDK_DIR }}/${{ steps.find_ipk.outputs.path }}
+          if-no-files-found: error
+
+  release:
+    name: Publish Release
+    runs-on: ubuntu-latest
+    needs: [build-apk, build-ipk]
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: release-assets/**/*
+ "$control"
+          grep -q '^Architecture: all
+          for required_file in \
+            usr/share/luci/menu.d/luci-app-wechatpush.json \
+            usr/share/rpcd/acl.d/luci-app-wechatpush.json \
+            etc/config/wechatpush \
+            etc/init.d/wechatpush \
+            etc/uci-defaults/luci-wechatpush \
+            usr/share/wechatpush/wechatpush \
+            usr/libexec/wechatpush-call
+          do
+            if [ ! -s "$data/$required_file" ]; then
+              echo "::error::Missing or empty IPK file: $required_file"
+              exit 1
+            fi
+          done
+
+          python3 - "$data/usr/share/luci/menu.d/luci-app-wechatpush.json" "$data/usr/share/rpcd/acl.d/luci-app-wechatpush.json" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as f:
+              menu = json.load(f)
+          with open(sys.argv[2], encoding="utf-8") as f:
+              acl = json.load(f)
+
+          assert "admin/services/wechatpush" in menu, "LuCI menu entry is missing"
+          assert "luci-app-wechatpush" in acl, "rpcd ACL group is missing"
+          for page in ("config", "advanced", "client", "log"):
+              assert f"admin/services/wechatpush/{page}" in menu, f"Menu page {page} is missing"
+          print("IPK metadata, install hooks, menu JSON, ACL JSON and required files verified.")
+          PY
+
+      - name: Upload .ipk artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PACKAGE_NAME }}-ipk-${{ matrix.target.name }}
+          path: ${{ env.SDK_DIR }}/${{ steps.find_ipk.outputs.path }}
+          if-no-files-found: error
+
+  release:
+    name: Publish Release
+    runs-on: ubuntu-latest
+    needs: [build-apk, build-ipk]
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: release-assets/**/*
+ "$control"
           test -s "$postinst"
           test -s "$postinst_pkg"
+          test -s "$prerm"
+          test -s "$prerm_pkg"
+          test -s "$conffiles"
           grep -q 'default_postinst' "$postinst"
           grep -q 'luci-indexcache' "$postinst_pkg"
           grep -q 'luci-modulecache' "$postinst_pkg"
           grep -q 'rpcd' "$postinst_pkg"
+          grep -q 'default_prerm' "$prerm"
+          grep -q 'PKG_UPGRADE' "$prerm_pkg"
+          grep -q 'crontab' "$prerm_pkg"
+          grep -q 'rm -rf /tmp/wechatpush' "$prerm_pkg"
+          grep -q 'firewall reload' "$prerm_pkg"
+
+          python3 - "$conffiles" <<'PY'
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as f:
+              files = [line.strip() for line in f if line.strip()]
+          assert files == ["/etc/config/wechatpush"], f"Unexpected preserved conffiles: {files}"
+          PY
 
           for required_file in \
             usr/share/luci/menu.d/luci-app-wechatpush.json \
