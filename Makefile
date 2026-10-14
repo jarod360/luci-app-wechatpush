@@ -70,13 +70,13 @@ define Package/$(PKG_NAME)/prerm
 # Remove only this plugin's cron entries; preserve unrelated root crontab jobs.
 if command -v crontab >/dev/null 2>&1; then
 	old_crontab=$(crontab -l 2>/dev/null || true)
-	new_crontab=$(printf '%s\\n' "$old_crontab" | grep -Fv \\
-		-e '/usr/share/wechatpush/wechatpush' \\
+	new_crontab=$(printf '%s\n' "$old_crontab" | grep -Fv \
+		-e '/usr/share/wechatpush/wechatpush' \
 		-e '/tmp/wechatpush/' || true)
 
 	if [ "$old_crontab" != "$new_crontab" ]; then
 		if [ -n "$new_crontab" ]; then
-			printf '%s\\n' "$new_crontab" | crontab - 2>/dev/null || true
+			printf '%s\n' "$new_crontab" | crontab - 2>/dev/null || true
 		else
 			crontab -r 2>/dev/null || true
 		fi
