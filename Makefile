@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-wechatpush
 PKG_VERSION:=3.6.14
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 LUCI_MAINTAINER:=tty228 <tty228@yeah.net>
 PKG_CONFIG_DEPENDS:= \
@@ -47,13 +47,56 @@ config PACKAGE_$(PKG_NAME)_Enable_Host_Information_Detection
         default n
 endef
 
+# Keep only the main UCI configuration when the package is removed.
 define Package/$(PKG_NAME)/conffiles
 /etc/config/wechatpush
-/usr/share/wechatpush/api/diy.json
-/usr/share/wechatpush/api/logo.jpg
-/usr/share/wechatpush/api/ipv4.list
-/usr/share/wechatpush/api/ipv6.list
-/usr/share/wechatpush/api/device_aliases.list
+endef
+
+# Remove runtime state created by the application before opkg removes package files.
+# OpenWrt's default_prerm invokes this hook from prerm-pkg, then disables/stops
+# every init script owned by this package.
+define Package/$(PKG_NAME)/prerm
+#!/bin/sh
+
+# Do not alter the running system when installing into an image/root directory.
+[ -n "${IPKG_INSTROOT}" ] && exit 0
+
+# Keep runtime state intact during an in-place package upgrade.
+[ "${PKG_UPGRADE}" = "1" ] && exit 0
+
+# Stop the service before deleting temporary files and scheduled tasks.
+[ -x /etc/init.d/wechatpush ] && /etc/init.d/wechatpush stop >/dev/null 2>&1 || true
+
+# Remove only this plugin's cron entries; preserve unrelated root crontab jobs.
+if command -v crontab >/dev/null 2>&1; then
+	old_crontab=$(crontab -l 2>/dev/null || true)
+	new_crontab=$(printf '%s\\n' "$old_crontab" | grep -Fv \\
+		-e '/usr/share/wechatpush/wechatpush' \\
+		-e '/tmp/wechatpush/' || true)
+
+	if [ "$old_crontab" != "$new_crontab" ]; then
+		if [ -n "$new_crontab" ]; then
+			printf '%s\\n' "$new_crontab" | crontab - 2>/dev/null || true
+		else
+			crontab -r 2>/dev/null || true
+		fi
+		[ -x /etc/init.d/cron ] && /etc/init.d/cron restart >/dev/null 2>&1 || true
+	fi
+fi
+
+# Remove volatile/runtime-generated files. Preserve /etc/config/wechatpush.
+rm -rf /tmp/wechatpush
+rm -f /usr/share/wechatpush/errlog /usr/share/wechatpush/autoreboot_count
+
+# The application adds dynamic firewall rules; reload clears those non-persistent rules.
+[ -x /etc/init.d/firewall ] && /etc/init.d/firewall reload >/dev/null 2>&1 || true
+
+# Invalidate LuCI caches so removed menu/ACL files are not served from stale cache.
+rm -f /tmp/luci-indexcache.*
+rm -rf /tmp/luci-modulecache
+killall -HUP rpcd 2>/dev/null || true
+
+exit 0
 endef
 
 include $(TOPDIR)/feeds/luci/luci.mk
