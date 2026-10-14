@@ -324,7 +324,6 @@ jobs:
           grep -q '^Version: 3.6.14-2$' "$control"
           grep -q '^Section: luci$' "$control"
           grep -q '^Architecture: all$' "$control"
-
           test -s "$postinst"
           test -s "$postinst_pkg"
           test -s "$prerm"
@@ -339,14 +338,8 @@ jobs:
           grep -q 'crontab' "$prerm_pkg"
           grep -q 'rm -rf /tmp/wechatpush' "$prerm_pkg"
           grep -q 'firewall reload' "$prerm_pkg"
-
-          python3 - "$conffiles" <<'PY'
-          import sys
-
-          with open(sys.argv[1], encoding="utf-8") as f:
-              files = [line.strip() for line in f if line.strip()]
-          assert files == ["/etc/config/wechatpush"], f"Unexpected preserved conffiles: {files}"
-          PY
+          test "$(grep -c '^/etc/config/wechatpush$' "$conffiles")" -eq 1
+          test "$(grep -c '^[^#[:space:]]' "$conffiles")" -eq 1
 
           for required_file in \
             etc/config/wechatpush \
