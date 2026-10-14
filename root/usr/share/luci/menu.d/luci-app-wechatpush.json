@@ -8,7 +8,7 @@
 		},
 		"depends": {
 			"acl": [ "luci-app-wechatpush" ],
-			"uci": { "wechatpush": true }
+			"fs": { "/etc/config/wechatpush": "file" }
 		}
 	},
 
