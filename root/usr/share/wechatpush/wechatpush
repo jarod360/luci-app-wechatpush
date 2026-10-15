@@ -1076,7 +1076,7 @@ format_traffic_bytes() {
 }
 
 qwrt_traffic_for_ip() {
-	local ip="$1" response mac upload download total
+	local ip="$1" mode="${2:-full}" response mac upload download total
 	[ "$qwrt_traffic_enable" = "1" ] || return 1
 	[[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || return 1
 	response=$(ubus call luci.client-rates get "$(jq -nc --arg ip "$ip" '{addresses:[$ip]}')" 2>/dev/null) || return 1
@@ -1086,8 +1086,14 @@ qwrt_traffic_for_ip() {
 	upload=$(printf '%s' "$response" | jq -r --arg mac "$mac" '.traffic[$mac].upload // empty' 2>/dev/null)
 	download=$(printf '%s' "$response" | jq -r --arg mac "$mac" '.traffic[$mac].download // empty' 2>/dev/null)
 	[ -n "$upload" ] && [ -n "$download" ] || return 1
-	total=$((upload + download))
-	printf '↑ %s / ↓ %s / Σ %s' "$(format_traffic_bytes "$upload")" "$(format_traffic_bytes "$download")" "$(format_traffic_bytes "$total")"
+	if [ "$mode" = "download" ]; then
+		printf '%s' "$(format_traffic_bytes "$download")"
+	elif [ "$mode" = "mpnews" ]; then
+		printf '↑ %s / ↓ %s' "$(format_traffic_bytes "$upload")" "$(format_traffic_bytes "$download")"
+	else
+		total=$((upload + download))
+		printf '↑ %s / ↓ %s / Σ %s' "$(format_traffic_bytes "$upload")" "$(format_traffic_bytes "$download")" "$(format_traffic_bytes "$total")"
+	fi
 }
 
 # 流量数据
@@ -2140,7 +2146,13 @@ ${str_title_start}$(translate "Currently %d online devices, details below" "$log
 		local mac total name time_up time_online
 		mac=$(getmac "$ip")
 		if [ "$has_usage" -eq 2 ]; then
-			total=$(qwrt_traffic_for_ip "$ip") || total="-"
+			if [[ "$jsonpath" == *"/qywx_mpnews.json" ]]; then
+				total=$(qwrt_traffic_for_ip "$ip" mpnews) || total="-"
+			elif [[ "$jsonpath" == *"/qywx_markdown.json" ]]; then
+				total=$(qwrt_traffic_for_ip "$ip" download) || total="-"
+			else
+				total=$(qwrt_traffic_for_ip "$ip") || total="-"
+			fi
 		elif [ "$has_usage" -eq 1 ]; then
 			total=$(usage get "$mac")
 		else
@@ -2198,7 +2210,13 @@ ${str_title_start}$(translate "Currently %d online devices, details below" "$log
 	local header="${str_linefeed}${str_tab}"
 	header+=$(pad_field "$(translate "IP Address")" "$ip_max")"${str_space}"
 	if [ "$has_usage" -eq 2 ]; then
-		header+=$(pad_field "↑ Upload / ↓ Download / Σ Total" "$total_max")
+		if [[ "$jsonpath" == *"/qywx_mpnews.json" ]]; then
+			header+=$(pad_field "↑ Upload / ↓ Download" "$total_max")
+		elif [[ "$jsonpath" == *"/qywx_markdown.json" ]]; then
+			header+=$(pad_field "↓ Download" "$total_max")
+		else
+			header+=$(pad_field "↑ Upload / ↓ Download / Σ Total" "$total_max")
+		fi
 	elif [ "$has_usage" -eq 1 ]; then
 		header+=$(pad_field "$(translate "Total Traffic")" "$total_max")
 	fi
@@ -3195,8 +3213,14 @@ down_send() {
 		local time_up=$(jq -r --arg ip "$ip" '.devices[] | select(.ip == $ip and .status == "offline") | .uptime' "$devices_json")
 		local ip_total
 		if [ "$qwrt_traffic_enable" = "1" ]; then
-			ip_total=$(qwrt_traffic_for_ip "$ip")
-			[ -n "$ip_total" ] && ip_total="${str_linefeed}${str_tab} - Upload / Download / Total: ${ip_total}"
+			if [[ "$jsonpath" == *"/qywx_mpnews.json" ]]; then
+				ip_total=$(qwrt_traffic_for_ip "$ip" mpnews)
+			elif [[ "$jsonpath" == *"/qywx_markdown.json" ]]; then
+				ip_total=$(qwrt_traffic_for_ip "$ip" download)
+			else
+				ip_total=$(qwrt_traffic_for_ip "$ip")
+			fi
+			[ -n "$ip_total" ] && ip_total="${str_linefeed}${str_tab} - ${ip_total}"
 		else
 			ip_total=$(usage get "$mac")
 			[ -n "$ip_total" ] && ip_total="${str_linefeed}${str_tab} - $(translate "Total Traffic:") ${str_space}${str_space}${str_space}${str_space}${ip_total}"
