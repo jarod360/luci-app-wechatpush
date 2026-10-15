@@ -202,11 +202,6 @@ return view.extend({
 		o.depends('jsonpath', '/usr/share/wechatpush/api/qywx_mpnews.json');
 		o.description = _('Supports JPG and PNG formats within 2MB <br> Optimal size: 900383 or 2.35:1');
 
-		o = s.taboption('basic', form.Value, 'proxy_ip', _('Trusted IP address'));
-		o.depends('jsonpath', '/usr/share/wechatpush/api/qywx_mpnews.json');
-		o.depends('jsonpath', '/usr/share/wechatpush/api/qywx_markdown.json');
-		o.description = _('If the application was created after June 20, 2022, you need to set the trusted IP. This option should be used in conjunction with a proxy server.');
-
 		o = s.taboption('basic', form.Value, 'qywx_api_url', _('WeChat Work API Base URL'));
 		o.placeholder = 'https://qyapi.weixin.qq.com';
 		o.rmempty = true;
