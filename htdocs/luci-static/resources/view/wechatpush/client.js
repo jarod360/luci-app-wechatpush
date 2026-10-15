@@ -45,6 +45,7 @@ return view.extend({
 	},
 
 	fetchDevices: function () {
+		var self = this;
 		var devices_path = '/tmp/wechatpush/devices.json';
 		return fs.read(devices_path).then(function (content) {
 			try {
@@ -83,7 +84,7 @@ return view.extend({
 							var item = traffic[mac];
 							if (item && (device.status === 'online' || device.status === 'unknown')) {
 								var up = Number(item.upload || 0), down = Number(item.download || 0);
-								device.usage = '↑ ' + formatTraffic(up) + ' / ↓ ' + formatTraffic(down) + ' / Σ ' + formatTraffic(up + down);
+								device.usage = '↑ ' + self.formatTraffic(up) + ' / ↓ ' + self.formatTraffic(down) + ' / Σ ' + self.formatTraffic(up + down);
 							} else if (device.status === 'online' || device.status === 'unknown') {
 								device.usage = '-';
 							}
