@@ -80,9 +80,11 @@ if command -v crontab >/dev/null 2>&1; then
 	fi
 fi
 
-# Remove runtime state, preserving /etc/config/wechatpush.
+# Remove all plugin-owned program/data directories and runtime state.
+# /etc/config/wechatpush is outside these paths and is the only conffile.
 rm -rf /tmp/wechatpush
-rm -f /usr/share/wechatpush/errlog /usr/share/wechatpush/autoreboot_count
+rm -rf /usr/share/wechatpush
+rm -rf /www/luci-static/resources/view/wechatpush
 
 # Clear non-persistent firewall rules created by the plugin.
 [ -x /etc/init.d/firewall ] && /etc/init.d/firewall reload >/dev/null 2>&1 || true
