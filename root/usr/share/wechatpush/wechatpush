@@ -3205,14 +3205,6 @@ diy_send() {
 
 	! jq -r '.' ${3} >/dev/null 2>&1 && log_change "[ERROR] $(translate "JSON format error, not a standard JSON file, please check %s for unescaped special characters or syntax errors" "$3")" && return 1
 
-	local diyurl=$(jq -r .url ${3}) && local diyurl=$(eval echo ${diyurl})
-	local type=$(jq -r '.type' ${3}) && local type=$(eval echo ${type})
-	local data=$(jq -r '.data' ${3}) && local data=$(eval echo ${data})
-	local content_type=$(jq -r '.content_type' ${3})
-
-	! jq "$type" ${3} >${tempjsonpath} && log_change "[ERROR] $(translate "type:{ } field format error after variable substitution, please check for unescaped special characters or syntax errors in type:{ } field")" && return 1
-
-	if [[ "$diyurl" =~ ^https?:// ]]; then
 		# 在本函数作用域内导出代理环境变量，使模板中的 Token、素材上传及消息发送请求统一使用 proxy_address。
 		# local -x 会在函数返回时恢复原环境，不影响其他推送流程。
 		if [ -n "$proxy_address" ]; then
@@ -3223,6 +3215,15 @@ diy_send() {
 			local -x HTTPS_PROXY="$proxy_address"
 			local -x ALL_PROXY="$proxy_address"
 		fi
+
+	local diyurl=$(jq -r .url ${3}) && local diyurl=$(eval echo ${diyurl})
+	local type=$(jq -r '.type' ${3}) && local type=$(eval echo ${type})
+	local data=$(jq -r '.data' ${3}) && local data=$(eval echo ${data})
+	local content_type=$(jq -r '.content_type' ${3})
+
+	! jq "$type" ${3} >${tempjsonpath} && log_change "[ERROR] $(translate "type:{ } field format error after variable substitution, please check for unescaped special characters or syntax errors in type:{ } field")" && return 1
+
+	if [[ "$diyurl" =~ ^https?:// ]]; then
 		local curl_response=$(run_with_tag curl --connect-timeout 30 --max-time 60 --retry 2 -X POST -H "$content_type" -d "$data" "${diyurl}")
 	else
 		local command=$(jq -r '.command' ${3}) && local command=$(eval echo ${command})
