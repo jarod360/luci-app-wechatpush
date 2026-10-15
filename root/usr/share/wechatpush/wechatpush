@@ -43,7 +43,7 @@ wait_and_cat() {
 # 初始化设置信息
 read_config() {
 	get_config \
-		"enable" "lite_enable" "device_name" "proxy_address" "qywx_api_url" "sleeptime" "oui_data" "reset_regularly" "qwrt_traffic_enable" "debuglevel" "lang" \
+		"enable" "lite_enable" "device_name" "proxy_address" "qywx_api_url" "sleeptime" "oui_data" "qwrt_traffic_enable" "debuglevel" "lang" \
 		"jsonpath" "sckey" "sc3key" "sc3uid" "sc3tags" "corpid" "userid" "agentid" "corpsecret" "mediapath" "wxpusher_apptoken" "wxpusher_uids" "wxpusher_topicIds" "pushplus_token" "wpush_apikey" "tg_api_server" "tg_token" "tg_chat_id" "tg_thread_id" "recipient_email" "smtp_host" "smtp_port" "smtp_tls" "smtp_starttls" "smtp_user" "smtp_passwordeval" "smtp_from" "smtp_from_full_name" \
 		"get_ipv4_mode" "ipv4_interface" "get_ipv6_mode" "ipv6_interface" \
 		"device_notification" "cpu_notification" "cpu_load_threshold" "temperature_threshold" \
@@ -176,7 +176,6 @@ init() {
 	fi
 
 	# 配置检查
-	[ "$qwrt_traffic_enable" != "1" ] && [ ! -f "/usr/sbin/wrtbwmon" ] && log_change "[WARN] $(translate "wrtbwmon not installed, legacy traffic statistics unavailable")"
 	[ -z "$ip_version" ] && log_change "[ERROR] $(translate "Cannot get iputils-arping version, please confirm if plugin is running properly")"
 	[ -z "$cu_version" ] && log_change "[ERROR] $(translate "Cannot get curl version, please confirm if plugin is running properly")"
 
@@ -228,7 +227,7 @@ init() {
 	/usr/libexec/wechatpush-call "down_oui"
 
 	# 文件清理
-	rm -f "${dir}/sheep_usage" "${dir}/old_sheep_usage" "${dir}/client_usage_aliases" "${dir}/old_client_usage_aliases" "/usr/share/wechatpush/errlog" "${dir}/temp_err" >/dev/null 2>&1
+	rm -f "${dir}/usage.db" "${dir}/usage6.db" "${dir}/sheep_usage" "${dir}/old_sheep_usage" "${dir}/client_usage_aliases" "${dir}/old_client_usage_aliases" "/usr/share/wechatpush/errlog" "${dir}/temp_err" >/dev/null 2>&1
 	LockFile unlock
 
 	# 防火墙初始化
@@ -260,17 +259,6 @@ cron() {
 		return
 	fi
 
-	# 重置流量
-	if [ "$qwrt_traffic_enable" != "1" ] && [ -n "$reset_regularly" ] && [ "$reset_regularly" -eq "1" ]; then
-		(
-			crontab -l 2>/dev/null
-			echo "0 0 * * * rm ${dir}/usage.db >/dev/null 2>&1"
-		) | crontab -
-		(
-			crontab -l 2>/dev/null
-			echo "0 0 * * * rm ${dir}/usage6.db >/dev/null 2>&1"
-		) | crontab -
-	fi
 
 	# 定时发送
 	if [ -n "$crontab_regular_time" ]; then
@@ -374,7 +362,6 @@ main() {
 	# 循环
 	while [ "$enable" -eq "1" ]; do
 		deltemp
-		[ "$qwrt_traffic_enable" != "1" ] && usage update
 
 		# 网络状态与 IP 变动
 		if [ "$get_ipv4_mode" -ne "0" ] || [ "$get_ipv6_mode" -ne "0" ]; then
@@ -1096,81 +1083,22 @@ qwrt_traffic_for_ip() {
 	fi
 }
 
-# 流量数据
-usage() {
-	[ ! -f "/usr/sbin/wrtbwmon" ] || [ -z "$1" ] && return
-	# 更新
-	if [ $1 == "update" ]; then
-		version_le() { test "$(echo "$@" | tr " " "\n" | sort -n | head -n 1)" == "$1"; }
-		version_ge() { test "$(echo "$@" | tr " " "\n" | sort -r | head -n 1)" == "$1"; }
-		[ -n "$wr_version" ] && (version_ge "${wr_version}" "1.2.0") && wrtbwmon -f ${dir}/usage.db 2>/dev/null && return
-		[ -n "$wr_version" ] && (version_le "${wr_version}" "1.0.0") || [ -z "$wr_version" ] && wrtbwmon update ${dir}/usage.db 2>/dev/null && return
-	# 获取
-	elif [ $1 == "get" ]; then
-		[ ! -f "${dir}/usage.db" ] && [ -z "$3" ] && echo $(bytes_for_humans "0") && return
-		[ ! -f "${dir}/usage.db" ] && [ -n "$3" ] && echo "0" && return
-		[ -z "$total_n" ] && total_n=$(head -n1 "${dir}/usage.db" | sed 's/,/\n/g' | awk '$0=="total"{print NR; exit}') 2>/dev/null
-		[ -z "$in_n" ] && in_n=$(head -n1 "${dir}/usage.db" | sed 's/,/\n/g' | awk '$0=="in"{print NR; exit}') 2>/dev/null
-		[ -z "$out_n" ] && out_n=$(head -n1 "${dir}/usage.db" | sed 's/,/\n/g' | awk '$0=="out"{print NR; exit}') 2>/dev/null
-		[ -z "$total_n" ] && total_n="6"
-		local selected_n="$total_n"
-		case "$4" in
-			in) selected_n="$in_n" ;;
-			out) selected_n="$out_n" ;;
-			total|"") selected_n="$total_n" ;;
-			*) selected_n="$total_n" ;;
-		esac
-		case "$4" in
-			in|out) [ -z "$selected_n" ] && return ;;
-			*) [ -z "$selected_n" ] && selected_n="$total_n" ;;
-		esac
-		[ -n "$2" ] && local tmptotal=$(cat "${dir}/usage.db" | sed 's/,,,/,0,0,/g' | sed 's/,,/,0,/g' | sed 's/,/ /g' | awk -v key="$2" -v column="$selected_n" '{for (i=1; i<=NF; i++) if (tolower($i)==tolower(key)) {print $column; exit}}' | grep -v "^$" | sort -u | head -n1) 2>/dev/null
-		[ -z "$tmptotal" ] && local tmptotal="0"
-		[ -z "$3" ] && echo $(bytes_for_humans "${tmptotal}") || echo "$tmptotal"
-	# 剔除
-	elif [ $1 == "down" ]; then
-		[ "$2" ] && sed -i "/,${2},/d" ${dir}/usage.db 2>/dev/null
-	fi
+# 根据在线设备 MAC 获取 QWRT 原生累计流量，输出：总量 上传 下载 方向标记。
+get_qwrt_usage_stats() {
+	local mac="$1" ip response rate_mac upload download total
+	[ "$qwrt_traffic_enable" = "1" ] && [ -n "$mac" ] || return 1
+	ip=$(jq -r --arg mac "$mac" '.devices[] | select(.status == "online" and ((.mac // "") | ascii_downcase) == ($mac | ascii_downcase)) | .ip' "$devices_json" | head -n1)
+	[[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || return 1
+	response=$(ubus call luci.client-rates get "$(jq -nc --arg ip "$ip" '{addresses:[$ip]}')" 2>/dev/null) || return 1
+	rate_mac=$(printf '%s' "$response" | jq -r --arg ip "$ip" '.rates[$ip].mac // empty' 2>/dev/null)
+	[ -n "$rate_mac" ] || rate_mac="$mac"
+	rate_mac=$(printf '%s' "$rate_mac" | tr '[:lower:]' '[:upper:]')
+	upload=$(printf '%s' "$response" | jq -r --arg mac "$rate_mac" '.traffic[$mac].upload // empty' 2>/dev/null)
+	download=$(printf '%s' "$response" | jq -r --arg mac "$rate_mac" '.traffic[$mac].download // empty' 2>/dev/null)
+	[[ "$upload" =~ ^[0-9]+$ ]] && [[ "$download" =~ ^[0-9]+$ ]] || return 1
+	total=$((upload + download))
+	printf '%s %s %s 1\n' "$total" "$upload" "$download"
 }
-
-get_usage_stats() {
-	local mac="$1"
-	local has_direction="0"
-
-	if [ ! -f "/usr/sbin/wrtbwmon" ] || [ -z "$mac" ] || [ ! -f "${dir}/usage.db" ]; then
-		echo "0 0 0 0"
-		return
-	fi
-
-	[ -z "$total_n" ] && total_n=$(head -n1 "${dir}/usage.db" | sed 's/,/\n/g' | awk '$0=="total"{print NR; exit}') 2>/dev/null
-	[ -z "$in_n" ] && in_n=$(head -n1 "${dir}/usage.db" | sed 's/,/\n/g' | awk '$0=="in"{print NR; exit}') 2>/dev/null
-	[ -z "$out_n" ] && out_n=$(head -n1 "${dir}/usage.db" | sed 's/,/\n/g' | awk '$0=="out"{print NR; exit}') 2>/dev/null
-	[ -z "$total_n" ] && total_n="6"
-	[ -n "$in_n" ] && [ -n "$out_n" ] && has_direction="1"
-
-	awk -F, -v key="$mac" -v total_col="$total_n" -v in_col="$in_n" -v out_col="$out_n" -v has_direction="$has_direction" '
-		{
-			for (i = 1; i <= NF; i++) {
-				if (tolower($i) == tolower(key)) {
-					total = $total_col + 0
-					in_bytes = 0
-					out_bytes = 0
-					if (has_direction == "1") {
-						in_bytes = $in_col + 0
-						out_bytes = $out_col + 0
-					}
-					print total, in_bytes, out_bytes, has_direction
-					found = 1
-					exit
-				}
-			}
-		}
-		END {
-			if (!found) print 0, 0, 0, has_direction
-		}
-	' "${dir}/usage.db" 2>/dev/null
-}
-
 # ------------------------------------
 # 需要经常调用的偷懒类
 #
@@ -1252,11 +1180,14 @@ geterrdevicealiases() {
 	done
 
 	# 进入免打扰时间已经超过一小时
-	if [ -n "$sheep_starttime" ] && [ "$(($(date +%s) - $sheep_starttime))" -ge "3600" ]; then
+	if [ "$qwrt_traffic_enable" = "1" ] && [ -n "$sheep_starttime" ] && [ "$(($(date +%s) - $sheep_starttime))" -ge "3600" ]; then
 		>${dir}/sheep_usage
 		local MACLIST=$(echo "$unattended_device_aliases" | grep -v "^$" | sort -u)
 		while IFS= read -r mac; do
-			[ -n "$mac" ] && local tmptotal=$(usage get ${mac} bytes)
+			[ -z "$mac" ] && continue
+			local usage_stats tmptotal
+			usage_stats=$(get_qwrt_usage_stats "$mac") || continue
+			tmptotal=$(echo "$usage_stats" | awk '{print $1}')
 			[ -n "$tmptotal" ] && awk 'BEGIN{printf "%.0f\n",'$tmptotal'/'204800'}' 2>/dev/null >>${dir}/sheep_usage
 		done <<<"$MACLIST"
 		[ -f ${dir}/old_sheep_usage ] && local old_sheep_usage=$(cat ${dir}/old_sheep_usage) 2>/dev/null || local old_sheep_usage=""
@@ -1975,8 +1906,6 @@ up() {
 			jq --arg ip "$ip" --arg mac "$mac" '.devices |= map(if .ip == $ip then .mac = $mac | .status = "online" else . end)' "$devices_json" >"$tmp_devices_json" && mv "$tmp_devices_json" "$devices_json"
 		# up
 		else
-			# 剔除（重置）流量数据
-			[ "$qwrt_traffic_enable" != "1" ] && usage down ${ip}
 			# 删除当前 IP 对应的键值，重新写入，否则要启用 unique_by(.ip) 去重
 			jq --arg ip "$ip" 'del(.devices[] | select(.ip == $ip))' "$devices_json" >"$tmp_devices_json" && mv "$tmp_devices_json" "$devices_json"
 			local name=$(getname "$ip" "$mac")
@@ -2116,7 +2045,6 @@ current_device() {
 	local logrow=$(jq '.devices | map(select(.status == "online")) | length' "$devices_json")
 	local has_usage=0
 	[ "$qwrt_traffic_enable" = "1" ] && has_usage=2
-	[ "$has_usage" -eq 0 ] && [ -f "${dir}/usage.db" ] && has_usage=1
 	
 	[ "$logrow" -eq "0" ] && {
 		local explain="${send_content}\
@@ -2153,10 +2081,6 @@ ${str_title_start}$(translate "Currently %d online devices, details below" "$log
 			else
 				total=$(qwrt_traffic_for_ip "$ip") || total="-"
 			fi
-		elif [ "$has_usage" -eq 1 ]; then
-			total=$(usage get "$mac")
-		else
-			total=""
 		fi
 		name=$(getname "$ip" "$mac")
 		name=$(cut_str "$name" "12")
@@ -2264,6 +2188,7 @@ unattended() {
 
 # 设备异常流量检测
 get_client_usage() {
+	[ "$qwrt_traffic_enable" = "1" ] || return
 	[ -z "$client_usage" ] && return
 	[ "$client_usage" -ne "1" ] && return
 	[ -z "$client_usage_max" ] && return
@@ -2280,15 +2205,16 @@ get_client_usage() {
 	if [ "$(($(date +%s) - $get_client_usage_time))" -ge "60" ]; then
 		>${dir}/client_usage_aliases
 		for mac in $MACLIST; do
-			local cur_total cur_in cur_out cur_has_direction
-			read -r cur_total cur_in cur_out cur_has_direction <<<"$(get_usage_stats "$mac")"
-			echo "$mac ${cur_total} ${cur_in} ${cur_out} ${cur_has_direction}" >>${dir}/client_usage_aliases
+			local cur_total cur_upload cur_download cur_has_direction usage_stats
+			usage_stats=$(get_qwrt_usage_stats "$mac") || continue
+			read -r cur_total cur_upload cur_download cur_has_direction <<<"$usage_stats"
+			echo "$mac ${cur_total} ${cur_upload} ${cur_download} ${cur_has_direction}" >>${dir}/client_usage_aliases
 			[ -f "${dir}/old_client_usage_aliases" ] || continue
 			local old_line=$(awk -v key="$mac" 'tolower($1)==tolower(key){print; exit}' "${dir}/old_client_usage_aliases" 2>/dev/null)
 			[ -z "$old_line" ] && continue
 
-			local old_mac prev_total prev_in prev_out old_has_direction
-			read -r old_mac prev_total prev_in prev_out old_has_direction <<<"$old_line"
+			local old_mac prev_total prev_upload prev_download old_has_direction
+			read -r old_mac prev_total prev_upload prev_download old_has_direction <<<"$old_line"
 			[ -z "$prev_total" ] && prev_total="0"
 			local delta_total=$((cur_total - prev_total))
 			[ "$delta_total" -lt "0" ] && continue
@@ -2314,15 +2240,15 @@ get_client_usage() {
 				local detail_upload=""
 				local detail_download=""
 				if [ "$cur_has_direction" = "1" ] && [ "$old_has_direction" = "1" ]; then
-					[ -z "$prev_in" ] && prev_in="0"
-					[ -z "$prev_out" ] && prev_out="0"
-					local delta_in=$((cur_in - prev_in))
-					local delta_out=$((cur_out - prev_out))
-					[ "$delta_in" -lt "0" ] && delta_in="0"
-					[ "$delta_out" -lt "0" ] && delta_out="0"
-					detail_upload="${str_linefeed}${str_tab} - $(translate "Upload Traffic:")${str_space}${str_space}$(bytes_for_humans "$delta_out")"
-					detail_download="${str_linefeed}${str_tab} - $(translate "Download Traffic:")${str_space}$(bytes_for_humans "$delta_in")"
-				fi
+					[ -z "$prev_upload" ] && prev_upload="0"
+					[ -z "$prev_download" ] && prev_download="0"
+					local delta_upload=$((cur_upload - prev_upload))
+					local delta_download=$((cur_download - prev_download))
+					[ "$delta_upload" -lt "0" ] && delta_upload="0"
+					[ "$delta_download" -lt "0" ] && delta_download="0"
+					detail_upload="${str_linefeed}${str_tab} - $(translate "Upload Traffic:")${str_space}${str_space}$(bytes_for_humans "$delta_upload")"
+					detail_download="${str_linefeed}${str_tab} - $(translate "Download Traffic:")${str_space}$(bytes_for_humans "$delta_download")"
+				fi	fi
 
 				local detail_dbm=""
 				local wxjk_dbm=$(get_signal_dbm "$mac")
@@ -3221,9 +3147,6 @@ down_send() {
 				ip_total=$(qwrt_traffic_for_ip "$ip")
 			fi
 			[ -n "$ip_total" ] && { if [ "$qwrt_traffic_enable" = "1" ]; then if [[ "$jsonpath" == *"/qywx_markdown.json" ]]; then ip_total="${str_linefeed}${str_tab} - Download: ${ip_total}"; else ip_total="${str_linefeed}${str_tab} - Upload / Download: ${ip_total}"; fi; else ip_total="${str_linefeed}${str_tab} - $(translate "Total Traffic:") ${str_space}${str_space}${str_space}${str_space}${ip_total}"; fi; }
-		else
-			ip_total=$(usage get "$mac")
-			[ -n "$ip_total" ] && ip_total="${str_linefeed}${str_tab} - $(translate "Total Traffic:") ${str_space}${str_space}${str_space}${str_space}${ip_total}"
 		fi
 		local time1=$(date +%s)
 		local time1=$(time_for_humans $(expr ${time1} - ${time_up}))
