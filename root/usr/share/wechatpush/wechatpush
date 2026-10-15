@@ -77,7 +77,7 @@ read_config() {
 			eval $(echo ${str_version:0:2}"_version")=$(apk list | grep -w ^${str_version} | grep 'installed' | awk '{print $1}' | awk -F ${str_version}"-" '{print $2}') 2>/dev/null
 		done
 	else
-		for str_version in "wrtbwmon" "iputils-arping" "curl" "iw"; do
+		for str_version in "iputils-arping" "curl" "iw"; do
 			eval $(echo ${str_version:0:2}"_version")=$(opkg list-installed | grep -w ^${str_version} | awk '{print $3}') 2>/dev/null
 		done
 	fi
@@ -261,7 +261,7 @@ cron() {
 	fi
 
 	# 重置流量
-	if [ -n "$reset_regularly" ] && [ "$reset_regularly" -eq "1" ]; then
+	if [ "$qwrt_traffic_enable" != "1" ] && [ -n "$reset_regularly" ] && [ "$reset_regularly" -eq "1" ]; then
 		(
 			crontab -l 2>/dev/null
 			echo "0 0 * * * rm ${dir}/usage.db >/dev/null 2>&1"
@@ -374,7 +374,7 @@ main() {
 	# 循环
 	while [ "$enable" -eq "1" ]; do
 		deltemp
-		usage update
+		[ "$qwrt_traffic_enable" != "1" ] && usage update
 
 		# 网络状态与 IP 变动
 		if [ "$get_ipv4_mode" -ne "0" ] || [ "$get_ipv6_mode" -ne "0" ]; then
@@ -1970,7 +1970,7 @@ up() {
 		# up
 		else
 			# 剔除（重置）流量数据
-			usage down ${ip}
+			[ "$qwrt_traffic_enable" != "1" ] && usage down ${ip}
 			# 删除当前 IP 对应的键值，重新写入，否则要启用 unique_by(.ip) 去重
 			jq --arg ip "$ip" 'del(.devices[] | select(.ip == $ip))' "$devices_json" >"$tmp_devices_json" && mv "$tmp_devices_json" "$devices_json"
 			local name=$(getname "$ip" "$mac")
@@ -3193,8 +3193,14 @@ down_send() {
 
 		local name=$(getname "$ip" "$mac")
 		local time_up=$(jq -r --arg ip "$ip" '.devices[] | select(.ip == $ip and .status == "offline") | .uptime' "$devices_json")
-		local ip_total=$(usage get "$mac")
-		[ -n "$ip_total" ] && ip_total="${str_linefeed}${str_tab} - $(translate "Total Traffic:") ${str_space}${str_space}${str_space}${str_space}${ip_total}"
+		local ip_total
+		if [ "$qwrt_traffic_enable" = "1" ]; then
+			ip_total=$(qwrt_traffic_for_ip "$ip")
+			[ -n "$ip_total" ] && ip_total="${str_linefeed}${str_tab} - Upload / Download / Total: ${ip_total}"
+		else
+			ip_total=$(usage get "$mac")
+			[ -n "$ip_total" ] && ip_total="${str_linefeed}${str_tab} - $(translate "Total Traffic:") ${str_space}${str_space}${str_space}${str_space}${ip_total}"
+		fi
 		local time1=$(date +%s)
 		local time1=$(time_for_humans $(expr ${time1} - ${time_up}))
 
