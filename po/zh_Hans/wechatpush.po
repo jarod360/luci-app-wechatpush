@@ -284,7 +284,7 @@ msgid "Proxy Address"
 msgstr "代理地址"
 
 #: applications/luci-app-wechatpush/htdocs/luci-static/resources/view/wechatpush/config.js:230
-msgid "When you want to use a proxy to push information, you can use this option.<br/>This may be helpful for scenarios like trusted IPs for WeChat Work.Using special characters may cause sending failure.<br/>Example:<br/>http://username:password@127.0.0.1:1080<br/>socks5://username:password@127.0.0.1:1080"
+msgid "Optional HTTP/SOCKS forward proxy for push requests. For WeChat Work, this proxy is used for access-token retrieval, media upload and message delivery. The public egress IP must also be allowed in the WeChat Work administrator console when IP allowlisting is enabled.<br/>Example:<br/>http://username:password@127.0.0.1:1080<br/>socks5://username:password@127.0.0.1:1080"
 msgstr "当你想要使用代理推送信息时，可以使用这个选项<br/>可能有助于企业微信可信 IP 等情况，默认为空，使用特殊符号可能会造成发送失败<br/>例子：<br/>http://username:password@127.0.0.1:1080<br/>socks5://username:password@127.0.0.1:1080"
 
 #: applications/luci-app-wechatpush/htdocs/luci-static/resources/view/wechatpush/config.js:230
