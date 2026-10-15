@@ -43,7 +43,7 @@ wait_and_cat() {
 # 初始化设置信息
 read_config() {
 	get_config \
-		"enable" "lite_enable" "device_name" "proxy_address" "sleeptime" "oui_data" "reset_regularly" "debuglevel" "lang" \
+		"enable" "lite_enable" "device_name" "proxy_address" "qywx_api_url" "sleeptime" "oui_data" "reset_regularly" "debuglevel" "lang" \
 		"jsonpath" "sckey" "sc3key" "sc3uid" "sc3tags" "corpid" "userid" "agentid" "corpsecret" "mediapath" "wxpusher_apptoken" "wxpusher_uids" "wxpusher_topicIds" "pushplus_token" "wpush_apikey" "tg_api_server" "tg_token" "tg_chat_id" "tg_thread_id" "recipient_email" "smtp_host" "smtp_port" "smtp_tls" "smtp_starttls" "smtp_user" "smtp_passwordeval" "smtp_from" "smtp_from_full_name" \
 		"get_ipv4_mode" "ipv4_interface" "get_ipv6_mode" "ipv6_interface" \
 		"device_notification" "cpu_notification" "cpu_load_threshold" "temperature_threshold" \
@@ -54,6 +54,10 @@ read_config() {
 		"up_timeout" "down_timeout" "timeout_retry_count" "always_check_ip_list" "only_timeout_push" "passive_mode" "thread_num" "defaultSortColumn" "soc_code" "server_host" "server_port" \
 		"unattended_enable" "zerotier_helper" "unattended_only_on_disturb_time" "unattended_device_aliases" "network_disconnect_event" "unattended_autoreboot_mode" "autoreboot_system_uptime" "autoreboot_network_uptime" \
 		"device_info_helper" "gateway_host_url" "gateway_info_url" "gateway_logout_url" "gateway_username_id" "gateway_password_id" "gateway_username" "gateway_password" "miwifi_ip" "miwifi_password" "mikrotik_ip" "mikrotik_username" "op_host_ips" "scan_ip_range" "device_info_helper_sleeptime"
+
+	# 企业微信 API 基础地址：未填写时回退到官方接口，移除末尾斜杠。
+	qywx_api_url="${qywx_api_url:-https://qyapi.weixin.qq.com}"
+	while [[ "$qywx_api_url" == */ ]]; do qywx_api_url="${qywx_api_url%/}"; done
 
 	(echo "$device_notification" | grep -q "online") && notification_online="true"
 	(echo "$device_notification" | grep -q "offline") && notification_offline="true"
@@ -3209,8 +3213,13 @@ diy_send() {
 	! jq "$type" ${3} >${tempjsonpath} && log_change "[ERROR] $(translate "type:{ } field format error after variable substitution, please check for unescaped special characters or syntax errors in type:{ } field")" && return 1
 
 	if [[ "$diyurl" =~ ^https?:// ]]; then
-		[ -n "$proxy_address" ] && local proxy_cmd="-x $proxy_address"
-		local curl_response=$(run_with_tag curl $proxy_cmd --connect-timeout 30 --max-time 60 --retry 2 -X POST -H "$content_type" -d "$data" "${diyurl}")
+		# 企业微信使用专用 API 基础地址，不再叠加通用 HTTP/SOCKS 代理；其他推送渠道保持原代理行为。
+		local -a proxy_args=()
+		case "$jsonpath" in
+			/usr/share/wechatpush/api/qywx_mpnews.json|/usr/share/wechatpush/api/qywx_markdown.json) ;;
+			*) [ -n "$proxy_address" ] && proxy_args=(-x "$proxy_address") ;;
+		esac
+		local curl_response=$(run_with_tag curl "${proxy_args[@]}" --connect-timeout 30 --max-time 60 --retry 2 -X POST -H "$content_type" -d "$data" "${diyurl}")
 	else
 		local command=$(jq -r '.command' ${3}) && local command=$(eval echo ${command})
 		local curl_response=$(run_with_tag jq -r "$command" "$data" | eval "$diyurl")
