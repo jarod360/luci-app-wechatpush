@@ -11,7 +11,6 @@
 			},
 			"ubus": {
 				"luci-rpc": [ "getHostHints" ],
-				"luci.client-rates": [ "get" ],
 				"service": [ "list" ]
 			},
 			"uci": [ "wechatpush" ]
