@@ -55,14 +55,14 @@ endef
 # Remove runtime state created by the application before opkg removes package files.
 # OpenWrt's default_prerm invokes this hook from prerm-pkg, then disables/stops
 # every init script owned by this package.
-define Package/\$(PKG_NAME)/prerm
+define Package/$(PKG_NAME)/prerm
 #!/bin/sh
 
 # Do not alter the running system when installing into an image/root directory.
-[ -n "$$\${IPKG_INSTROOT}" ] && exit 0
+[ -n "$\${IPKG_INSTROOT}" ] && exit 0
 
 # Keep runtime state intact during an in-place package upgrade.
-[ "$$\${PKG_UPGRADE}" = "1" ] && exit 0
+[ "$\${PKG_UPGRADE}" = "1" ] && exit 0
 
 # The default_prerm wrapper has already disabled and stopped this package's init script.
 # Remove only this plugin's cron entries; preserve unrelated root crontab jobs.
