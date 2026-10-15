@@ -19,8 +19,9 @@ return view.extend({
 		// 清除 localStorage 中的排序设置
 		localStorage.removeItem('sortColumn');
 		localStorage.removeItem('sortDirection');
-		uci.load('wechatpush');
-		return this.fetchAndRenderDevices().then(function () {
+		return uci.load('wechatpush').then(function () {
+			return self.fetchAndRenderDevices();
+		}).then(function () {
 			self.setupAutoRefresh();
 		});
 	},
