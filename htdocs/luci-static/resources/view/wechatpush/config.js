@@ -174,6 +174,13 @@ return view.extend({
 		o.description = _('ServerChan3 message tags, split with |');
 		o.depends('jsonpath', '/usr/share/wechatpush/api/serverchan3.json');
 
+		o = s.taboption('basic', form.Value, 'qywx_api_url', _('WeChat Work API Base URL'));
+		o.placeholder = 'https://qyapi.weixin.qq.com';
+		o.rmempty = true;
+		o.description = _('Optional API proxy base URL. Leave empty to use the official WeChat Work API. Enter only the base URL, without /cgi-bin/...');
+		o.depends('jsonpath', '/usr/share/wechatpush/api/qywx_mpnews.json');
+		o.depends('jsonpath', '/usr/share/wechatpush/api/qywx_markdown.json');
+
 		o = s.taboption('basic', form.Value, 'corpid', _('corpid'));
 		o.description = _('Get Instructions') + ' <a href="https://work.weixin.qq.com/api/doc/10013" target="_blank">' + _('Click here') + '</a>';
 		o.rmempty = false;
@@ -201,11 +208,6 @@ return view.extend({
 		o.default = '/usr/share/wechatpush/api/logo.jpg';
 		o.depends('jsonpath', '/usr/share/wechatpush/api/qywx_mpnews.json');
 		o.description = _('Supports JPG and PNG formats within 2MB <br> Optimal size: 900383 or 2.35:1');
-
-		o = s.taboption('basic', form.Value, 'proxy_ip', _('Trusted IP address'));
-		o.depends('jsonpath', '/usr/share/wechatpush/api/qywx_mpnews.json');
-		o.depends('jsonpath', '/usr/share/wechatpush/api/qywx_markdown.json');
-		o.description = _('If the application was created after June 20, 2022, you need to set the trusted IP. This option should be used in conjunction with a proxy server.');
 
 		o = s.taboption('basic', form.Value, 'wxpusher_apptoken', _('appToken'));
 		o.description = _('Get Instructions') + ' <a href="https://wxpusher.zjiecode.com/docs/#/?id=%e5%bf%ab%e9%80%9f%e6%8e%a5%e5%85%a5" target="_blank">' + _('Click here') + '</a>';
@@ -315,7 +317,6 @@ return view.extend({
 		o.description = _('When you want to use a proxy to push information, you can use this option.<br/>This may be helpful for scenarios like trusted IPs for WeChat Work.Using special characters may cause sending failure.<br/>Example:<br/>http://username:password@127.0.0.1:1080<br/>socks5://username:password@127.0.0.1:1080');
 		o.depends('jsonpath', '/usr/share/wechatpush/api/serverchan.json');
 		o.depends('jsonpath', '/usr/share/wechatpush/api/serverchan3.json');
-		o.depends('jsonpath', '/usr/share/wechatpush/api/qywx_mpnews.json');
 		o.depends('jsonpath', '/usr/share/wechatpush/api/wxpusher.json');
 		o.depends('jsonpath', '/usr/share/wechatpush/api/pushplus.json');
 		o.depends('jsonpath', '/usr/share/wechatpush/api/wpush.json');
