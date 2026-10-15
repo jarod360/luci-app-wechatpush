@@ -71,7 +71,7 @@ return view.extend({
 				});
 				if (uci.get('wechatpush', 'config', 'qwrt_traffic_enable') === '1') {
 					var addresses = data.devices.filter(function (device) {
-						return (device.status === 'online' || device.status === 'unknown') && /^\\d{1,3}(\\.\\d{1,3}){3}$/.test(device.ip || '');
+						return (device.status === 'online' || device.status === 'unknown') && /^\d{1,3}(\.\d{1,3}){3}$/.test(device.ip || '');
 					}).map(function (device) { return device.ip; });
 
 					if (addresses.length) {
