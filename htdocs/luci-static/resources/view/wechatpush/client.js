@@ -77,19 +77,19 @@ return view.extend({
 					if (addresses.length) {
 						return L.resolveDefault(callClientRates(addresses), {}).then(function (stats) {
 							var rates = stats.rates || {};
-						var traffic = stats.traffic || {};
-						data.devices.forEach(function (device) {
-							var rate = rates[device.ip];
-							var mac = (device.mac || (rate && rate.mac) || '').toUpperCase();
-							var item = traffic[mac];
-							if (item && (device.status === 'online' || device.status === 'unknown')) {
-								var up = Number(item.upload || 0), down = Number(item.download || 0);
-								device.usage = '↑ ' + self.formatTraffic(up) + ' / ↓ ' + self.formatTraffic(down) + ' / Σ ' + self.formatTraffic(up + down);
-							} else if (device.status === 'online' || device.status === 'unknown') {
-								device.usage = '-';
-							}
-						});
-						return { devices: data.devices };
+							var traffic = stats.traffic || {};
+							data.devices.forEach(function (device) {
+								var rate = rates[device.ip];
+								var mac = (device.mac || (rate && rate.mac) || '').toUpperCase();
+								var item = traffic[mac];
+								if (item && (device.status === 'online' || device.status === 'unknown')) {
+									var up = Number(item.upload || 0), down = Number(item.download || 0);
+									device.usage = '↑ ' + self.formatTraffic(up) + ' / ↓ ' + self.formatTraffic(down) + ' / Σ ' + self.formatTraffic(up + down);
+								} else if (device.status === 'online' || device.status === 'unknown') {
+									device.usage = '-';
+								}
+							});
+							return { devices: data.devices };
 						});
 					}
 				}
