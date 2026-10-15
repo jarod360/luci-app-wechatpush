@@ -8,4 +8,5 @@ config wechatpush "config"
 	option timeout_retry_count '2'
     option thread_num '3'
 	option tg_api_server 'https://api.telegram.org'
+	option qywx_api_url ''
 	option tg_chat_id ''
