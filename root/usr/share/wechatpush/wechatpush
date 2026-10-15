@@ -2248,7 +2248,7 @@ get_client_usage() {
 					[ "$delta_download" -lt "0" ] && delta_download="0"
 					detail_upload="${str_linefeed}${str_tab} - $(translate "Upload Traffic:")${str_space}${str_space}$(bytes_for_humans "$delta_upload")"
 					detail_download="${str_linefeed}${str_tab} - $(translate "Download Traffic:")${str_space}$(bytes_for_humans "$delta_download")"
-				fi	fi
+				fi
 
 				local detail_dbm=""
 				local wxjk_dbm=$(get_signal_dbm "$mac")
