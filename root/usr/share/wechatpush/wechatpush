@@ -3220,7 +3220,7 @@ down_send() {
 			else
 				ip_total=$(qwrt_traffic_for_ip "$ip")
 			fi
-			[ -n "$ip_total" ] && { if [[ "$jsonpath" == *"/qywx_markdown.json" ]]; then ip_total="${str_linefeed}${str_tab} - Download: ${ip_total}"; else ip_total="${str_linefeed}${str_tab} - Upload / Download: ${ip_total}"; fi; }
+			[ -n "$ip_total" ] && { if [ "$qwrt_traffic_enable" = "1" ]; then if [[ "$jsonpath" == *"/qywx_markdown.json" ]]; then ip_total="${str_linefeed}${str_tab} - Download: ${ip_total}"; else ip_total="${str_linefeed}${str_tab} - Upload / Download: ${ip_total}"; fi; else ip_total="${str_linefeed}${str_tab} - $(translate "Total Traffic:") ${str_space}${str_space}${str_space}${str_space}${ip_total}"; fi; }
 		else
 			ip_total=$(usage get "$mac")
 			[ -n "$ip_total" ] && ip_total="${str_linefeed}${str_tab} - $(translate "Total Traffic:") ${str_space}${str_space}${str_space}${str_space}${ip_total}"
