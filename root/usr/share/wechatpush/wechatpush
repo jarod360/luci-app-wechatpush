@@ -3205,16 +3205,19 @@ diy_send() {
 
 	! jq -r '.' ${3} >/dev/null 2>&1 && log_change "[ERROR] $(translate "JSON format error, not a standard JSON file, please check %s for unescaped special characters or syntax errors" "$3")" && return 1
 
-		# 在本函数作用域内导出代理环境变量，使模板中的 Token、素材上传及消息发送请求统一使用 proxy_address。
-		# local -x 会在函数返回时恢复原环境，不影响其他推送流程。
-		if [ -n "$proxy_address" ]; then
-			local -x http_proxy="$proxy_address"
-			local -x https_proxy="$proxy_address"
-			local -x all_proxy="$proxy_address"
-			local -x HTTP_PROXY="$proxy_address"
-			local -x HTTPS_PROXY="$proxy_address"
-			local -x ALL_PROXY="$proxy_address"
-		fi
+	# 在本函数作用域内导出代理环境变量，使模板中的 Token、素材上传及消息发送请求统一使用 proxy_address。
+	# local -x 会在函数返回时恢复原环境，不影响其他推送流程。
+	if [ -n "$proxy_address" ]; then
+		local -x http_proxy="$proxy_address"
+		local -x https_proxy="$proxy_address"
+		local -x all_proxy="$proxy_address"
+		local -x HTTP_PROXY="$proxy_address"
+		local -x HTTPS_PROXY="$proxy_address"
+		local -x ALL_PROXY="$proxy_address"
+		# 防止继承的 NO_PROXY 规则绕过用户明确配置的代理。
+		local -x no_proxy=''
+		local -x NO_PROXY=''
+	fi
 
 	local diyurl=$(jq -r .url ${3}) && local diyurl=$(eval echo ${diyurl})
 	local type=$(jq -r '.type' ${3}) && local type=$(eval echo ${type})
