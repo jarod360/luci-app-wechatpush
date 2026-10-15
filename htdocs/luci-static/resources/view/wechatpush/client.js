@@ -4,6 +4,15 @@
 'require ui';
 'require poll';
 'require uci';
+'require rpc';
+
+var callClientRates = rpc.declare({
+	object: 'luci.client-rates',
+	method: 'get',
+	params: ['addresses'],
+	expect: { '': {} }
+});
+
 
 return view.extend({
 	load: function () {
@@ -28,12 +37,45 @@ return view.extend({
 		});
 	},
 
+	formatTraffic: function (bytes) {
+		var value = Math.max(0, Number(bytes) || 0);
+		var unit = 'KB';
+		value /= 1024;
+		if (value >= 1024) { value /= 1024; unit = 'MB'; }
+		if (value >= 1024) { value /= 1024; unit = 'GB'; }
+		return value.toFixed(2) + ' ' + unit;
+	},
+
 	fetchDevices: function () {
 		var self = this;
 		var devices_path = '/tmp/wechatpush/devices.json';
 		return fs.read(devices_path).then(function (content) {
 			try {
 				var data = JSON.parse(content);
+				if (uci.get('wechatpush', 'config', 'qwrt_traffic_enable') === '1') {
+					var addresses = data.devices.filter(function (device) {
+						return (device.status === 'online' || device.status === 'unknown') && /^\d{1,3}(\.\d{1,3}){3}$/.test(device.ip || '');
+					}).map(function (device) { return device.ip; });
+
+					if (addresses.length) {
+						return L.resolveDefault(callClientRates(addresses), {}).then(function (stats) {
+							var rates = stats.rates || {};
+							var traffic = stats.traffic || {};
+							data.devices.forEach(function (device) {
+								var rate = rates[device.ip];
+								var mac = (device.mac || (rate && rate.mac) || '').toUpperCase();
+								var item = traffic[mac];
+								if (item && (device.status === 'online' || device.status === 'unknown')) {
+									var up = Number(item.upload || 0), down = Number(item.download || 0);
+									device.usage = '↑ ' + self.formatTraffic(up) + ' / ↓ ' + self.formatTraffic(down) + ' / Σ ' + self.formatTraffic(up + down);
+								} else if (device.status === 'online' || device.status === 'unknown') {
+									device.usage = '-';
+								}
+							});
+							return { devices: data.devices };
+						});
+					}
+				}
 				return { devices: data.devices };
 			} catch (e) {
 				console.error('Error parsing JSON:', e);
@@ -48,8 +90,8 @@ return view.extend({
 		}
 		var devices = data.devices.filter(device => device.status === 'online' || device.status === 'unknown');
 		var totalDevices = devices.length;
-		var headers = [_('Hostname'), _('IPv4 address'), _('MAC address'), _('Connection Point'), _('Online time')];
-		var columns = ['name', 'ip', 'mac', 'parent', 'uptime'];
+		var headers = [_('Hostname'), _('IPv4 address'), _('MAC address'), _('Connection Point'), _('Online time'), _('Details')];
+		var columns = ['name', 'ip', 'mac', 'parent', 'uptime', 'usage'];
 		var visibleColumns = [];
 		var hasData = false;
 
