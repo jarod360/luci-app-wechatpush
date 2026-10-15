@@ -368,10 +368,6 @@ msgstr "已是最新，跳过更新"
 msgid "Browser timeout or unknown error. If the log shows that the update process has been established, please ignore this error: %s."
 msgstr "浏览器超时强制退出或未知错误，若日志显示已建立更新进程，请忽略此错误：%s"
 
-#: applications/luci-app-wechatpush/htdocs/luci-static/resources/view/wechatpush/config.js:285
-msgid "Reset Traffic Data Every Day at Midnight"
-msgstr "每天零点重置流量数据"
-
 #: applications/luci-app-wechatpush/htdocs/luci-static/resources/view/wechatpush/config.js:287
 msgid "Enable Logging"
 msgstr "开启日志"
@@ -1575,9 +1571,6 @@ msgstr "开始运行..."
 msgid "Loaded logs from previous restart"
 msgstr "载入上次重启前日志"
 
-msgid "wrtbwmon not installed, traffic statistics unavailable"
-msgstr "未安装 wrtbwmon，流量统计不可用"
-
 msgid "Cannot get iputils-arping version, please confirm if plugin is running properly"
 msgstr "无法获取依赖项 iputils-arping 版本号，请确认插件是否正常运行"
 
@@ -1636,7 +1629,6 @@ msgstr "优先显示在线设备"
 
 msgid "Only effective when service is running"
 msgstr "仅在服务运行时生效"
-
 
 msgid "WeChat Work API Base URL"
 msgstr "代理 API 地址"
