@@ -29,7 +29,7 @@
 | Telegram | bot | https://t.me/BotFather
 | Mail | msmtp | https://marlam.de/msmtp/
 
-**企业微信 API 代理：** 选择“企业微信图文消息”或“企业微信 Markdown”后，可在基础设置中填写“企业微信代理 API 地址”。填写代理服务的基础 URL（例如 `https://api.example.com`），插件会将获取 Token、上传封面素材和发送消息三个请求统一转发到该地址；留空时使用官方地址 `https://qyapi.weixin.qq.com`。此配置独立于其他推送渠道的“Proxy Address”，不会改变其他渠道的代理设置。
+**企业微信 API 地址与正向代理：** 选择“企业微信图文消息”或“企业微信 Markdown”后，可在基础设置中填写“企业微信 API Base URL”。它是企业微信 API 的基础地址（例如 `https://api.example.com`），获取 Token、上传封面素材和发送消息都会使用该地址；留空时使用官方地址 `https://qyapi.weixin.qq.com`。如需通过 HTTP/SOCKS 正向代理访问该 API，可同时填写“Proxy Address”；该代理会应用于获取 Token、上传素材和发送消息的全部请求。两项配置相互独立：前者决定请求发往哪个 API 主机，后者决定网络连接经过哪个代理。若企业微信启用了可信 IP 白名单，还需在企业微信管理后台放行代理服务器的公网出口 IP。
 
 精力有限，如需要钉钉推送、飞书推送、Bark 推送等请尝试另一个分支 https://github.com/zzsj0928/luci-app-pushbot ，或使用自定义 API 设置
 
