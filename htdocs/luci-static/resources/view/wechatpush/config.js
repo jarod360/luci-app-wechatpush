@@ -388,7 +388,12 @@ return view.extend({
 		o.depends('oui_data', '1');
 		o.depends('oui_data', '2');
 
+		o = s.taboption('basic', form.Flag, 'qwrt_traffic_enable', _('Enable QWRT native traffic statistics'));
+		o.default = '0';
+		o.description = _('Enable traffic display using QWRT 2026.10.6 and newer native statistics. Do not enable on non-QWRT systems. Shows upload, download and total traffic on the online-device page and in push messages.');
+
 		o = s.taboption('basic', form.Flag, 'reset_regularly', _('Reset Traffic Data Every Day at Midnight'));
+		o.depends('qwrt_traffic_enable', '0');
 
 		o = s.taboption('basic', form.Flag, 'prefer_client_page', _('Prefer displaying online devices'));
 		o.default = '1';
