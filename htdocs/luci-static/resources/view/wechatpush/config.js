@@ -314,13 +314,15 @@ return view.extend({
 		o.depends('jsonpath', '/usr/share/wechatpush/api/diy.json');
 
 		o = s.taboption('basic', form.Value, 'proxy_address', _('Proxy Address'));
-		o.description = _('When you want to use a proxy to push information, you can use this option.<br/>This may be helpful for scenarios like trusted IPs for WeChat Work.Using special characters may cause sending failure.<br/>Example:<br/>http://username:password@127.0.0.1:1080<br/>socks5://username:password@127.0.0.1:1080');
+		o.description = _('Optional HTTP/SOCKS forward proxy for push requests. For WeChat Work, this proxy is used for access-token retrieval, media upload and message delivery. The public egress IP must also be allowed in the WeChat Work administrator console when IP allowlisting is enabled.<br/>Example:<br/>http://username:password@127.0.0.1:1080<br/>socks5://username:password@127.0.0.1:1080');
 		o.depends('jsonpath', '/usr/share/wechatpush/api/serverchan.json');
 		o.depends('jsonpath', '/usr/share/wechatpush/api/serverchan3.json');
 		o.depends('jsonpath', '/usr/share/wechatpush/api/wxpusher.json');
 		o.depends('jsonpath', '/usr/share/wechatpush/api/pushplus.json');
 		o.depends('jsonpath', '/usr/share/wechatpush/api/wpush.json');
 		o.depends('jsonpath', '/usr/share/wechatpush/api/telegram.json');
+		o.depends('jsonpath', '/usr/share/wechatpush/api/qywx_mpnews.json');
+		o.depends('jsonpath', '/usr/share/wechatpush/api/qywx_markdown.json');
 		o.depends('jsonpath', '/usr/share/wechatpush/api/diy.json');
 
 		o = s.taboption('basic', form.Button, '_test', _('Send Test'), _('You may need to save the configuration before sending.'));
