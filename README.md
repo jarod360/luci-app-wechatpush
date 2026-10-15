@@ -29,6 +29,8 @@
 | Telegram | bot | https://t.me/BotFather
 | Mail | msmtp | https://marlam.de/msmtp/
 
+**企业微信 API 代理：** 选择“企业微信图文消息”或“企业微信 Markdown”后，可在基础设置中填写“企业微信代理 API 地址”。填写代理服务的基础 URL（例如 `https://api.example.com`），插件会将获取 Token、上传封面素材和发送消息三个请求统一转发到该地址；留空时使用官方地址 `https://qyapi.weixin.qq.com`。此配置独立于其他推送渠道的“Proxy Address”，不会改变其他渠道的代理设置。
+
 精力有限，如需要钉钉推送、飞书推送、Bark 推送等请尝试另一个分支 https://github.com/zzsj0928/luci-app-pushbot ，或使用自定义 API 设置
 
 v2.06.2 之后的版本不再支持 LuCI 18.06，如需编译，请使用 openwrt-18.06 分支，拉取源码时请使用 `git clone -b openwrt-18.06 https://github.com/tty228/luci-app-wechatpush.git` 命令
