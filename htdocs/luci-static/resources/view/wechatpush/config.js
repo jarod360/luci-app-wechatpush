@@ -392,8 +392,6 @@ return view.extend({
 		o.default = '0';
 		o.description = _('仅 QWRT 2026.10.6 及以上版本开启流量显示，非 QWRT 版本请勿打开。开启后在线设备页面及推送显示上传、下载和总流量。');
 
-		o = s.taboption('basic', form.Flag, 'reset_regularly', _('Reset Traffic Data Every Day at Midnight'));
-		o.depends('qwrt_traffic_enable', '0');
 
 		o = s.taboption('basic', form.Flag, 'prefer_client_page', _('Prefer displaying online devices'));
 		o.default = '1';
@@ -552,8 +550,9 @@ return view.extend({
 		o.description = _('Send notification after exceeding the count, and optionally auto-ban IP');
 
 		o = s.taboption('content', form.Flag, 'client_usage', _('Device abnormal traffic alert'));
-		o.description = _('Please ensure that you can retrieve device traffic information correctly, otherwise this feature will not work properly');
+		o.description = _('使用 QWRT 原生累计流量统计每分钟流量增量，需先启用基础设置中的 QWRT 原生流量统计。');
 		o.default = '0';
+		o.depends('qwrt_traffic_enable', '1');
 
 		o = s.taboption('content', form.Value, 'client_usage_max', _('Per-minute traffic limit'));
 		o.placeholder = '10M';
