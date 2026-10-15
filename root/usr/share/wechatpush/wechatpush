@@ -43,7 +43,7 @@ wait_and_cat() {
 # 初始化设置信息
 read_config() {
 	get_config \
-		"enable" "lite_enable" "device_name" "proxy_address" "qywx_api_url" "sleeptime" "oui_data" "reset_regularly" "debuglevel" "lang" \
+		"enable" "lite_enable" "device_name" "proxy_address" "qywx_api_url" "sleeptime" "oui_data" "reset_regularly" "qwrt_traffic_enable" "debuglevel" "lang" \
 		"jsonpath" "sckey" "sc3key" "sc3uid" "sc3tags" "corpid" "userid" "agentid" "corpsecret" "mediapath" "wxpusher_apptoken" "wxpusher_uids" "wxpusher_topicIds" "pushplus_token" "wpush_apikey" "tg_api_server" "tg_token" "tg_chat_id" "tg_thread_id" "recipient_email" "smtp_host" "smtp_port" "smtp_tls" "smtp_starttls" "smtp_user" "smtp_passwordeval" "smtp_from" "smtp_from_full_name" \
 		"get_ipv4_mode" "ipv4_interface" "get_ipv6_mode" "ipv6_interface" \
 		"device_notification" "cpu_notification" "cpu_load_threshold" "temperature_threshold" \
@@ -73,7 +73,7 @@ read_config() {
 	(echo "$device_info_helper" | grep -q "openwrt_info") && openwrt_info_enable="true"
 	op_host_ips=$(echo "$op_host_ips" | sed 's/ /\n/g') 2>/dev/null
 	if [ -x "/usr/bin/apk" ]; then
-		for str_version in "wrtbwmon" "iputils-arping" "curl" "iw"; do
+		for str_version in "iputils-arping" "curl" "iw"; do
 			eval $(echo ${str_version:0:2}"_version")=$(apk list | grep -w ^${str_version} | grep 'installed' | awk '{print $1}' | awk -F ${str_version}"-" '{print $2}') 2>/dev/null
 		done
 	else
@@ -176,7 +176,7 @@ init() {
 	fi
 
 	# 配置检查
-	[ ! -f "/usr/sbin/wrtbwmon" ] && log_change "[WARN] $(translate "wrtbwmon not installed, traffic statistics unavailable")"
+	[ "$qwrt_traffic_enable" != "1" ] && [ ! -f "/usr/sbin/wrtbwmon" ] && log_change "[WARN] $(translate "wrtbwmon not installed, legacy traffic statistics unavailable")"
 	[ -z "$ip_version" ] && log_change "[ERROR] $(translate "Cannot get iputils-arping version, please confirm if plugin is running properly")"
 	[ -z "$cu_version" ] && log_change "[ERROR] $(translate "Cannot get curl version, please confirm if plugin is running properly")"
 
@@ -1061,6 +1061,33 @@ soc_temp() {
 	# 将 thermal_zone* 改为 thermal_zone0 thermal_zone1 等，就可以指定设备了
 	[ -z "$temperature" ] && local temperature=$(cat /sys/class/thermal/thermal_zone*/temp 2>/dev/null | sort -nr | head -n1 | cut -c-2)
 	printf "%.1f" "$temperature"
+}
+
+
+# QWRT 原生累计流量：仅在用户明确启用时调用，参数为 IPv4 地址。
+format_traffic_bytes() {
+	local bytes="${1:-0}"
+	awk -v n="$bytes" 'BEGIN {
+		n += 0;
+		if (n >= 1073741824) printf "%.2f GB", n / 1073741824;
+		else if (n >= 1048576) printf "%.2f MB", n / 1048576;
+		else printf "%.2f KB", n / 1024;
+	}'
+}
+
+qwrt_traffic_for_ip() {
+	local ip="$1" response mac upload download total
+	[ "$qwrt_traffic_enable" = "1" ] || return 1
+	[[ "$ip" =~ ^([0-9]{1,3}\\.){3}[0-9]{1,3}$ ]] || return 1
+	response=$(ubus call luci.client-rates get "$(jq -nc --arg ip "$ip" '{addresses:[$ip]}')" 2>/dev/null) || return 1
+	mac=$(printf '%s' "$response" | jq -r --arg ip "$ip" '.rates[$ip].mac // empty' 2>/dev/null)
+	[ -n "$mac" ] || return 1
+	mac=$(printf '%s' "$mac" | tr '[:lower:]' '[:upper:]')
+	upload=$(printf '%s' "$response" | jq -r --arg mac "$mac" '.traffic[$mac].upload // empty' 2>/dev/null)
+	download=$(printf '%s' "$response" | jq -r --arg mac "$mac" '.traffic[$mac].download // empty' 2>/dev/null)
+	[ -n "$upload" ] && [ -n "$download" ] || return 1
+	total=$((upload + download))
+	printf '↑ %s / ↓ %s / Σ %s' "$(format_traffic_bytes "$upload")" "$(format_traffic_bytes "$download")" "$(format_traffic_bytes "$total")"
 }
 
 # 流量数据
@@ -2082,7 +2109,8 @@ current_device() {
 	}
 	local logrow=$(jq '.devices | map(select(.status == "online")) | length' "$devices_json")
 	local has_usage=0
-	[ -f "${dir}/usage.db" ] && has_usage=1
+	[ "$qwrt_traffic_enable" = "1" ] && has_usage=2
+	[ "$has_usage" -eq 0 ] && [ -f "${dir}/usage.db" ] && has_usage=1
 	
 	[ "$logrow" -eq "0" ] && {
 		local explain="${send_content}\
@@ -2111,7 +2139,9 @@ ${str_title_start}$(translate "Currently %d online devices, details below" "$log
 	for ip in $IPLIST; do
 		local mac total name time_up time_online
 		mac=$(getmac "$ip")
-		if [ "$has_usage" -eq 1 ]; then
+		if [ "$has_usage" -eq 2 ]; then
+			total=$(qwrt_traffic_for_ip "$ip") || total="-"
+		elif [ "$has_usage" -eq 1 ]; then
 			total=$(usage get "$mac")
 		else
 			total=""
@@ -2135,7 +2165,7 @@ ${str_title_start}$(translate "Currently %d online devices, details below" "$log
 		len_ip=$(length_str "${ips[i]}")
 		[ "$len_ip" -gt "$ip_max" ] && ip_max=$len_ip
 
-		if [ "$has_usage" -eq 1 ]; then
+		if [ "$has_usage" -ne 0 ]; then
 			len_total=$(length_str "${totals[i]}")
 			[ "$len_total" -gt "$total_max" ] && total_max=$len_total
 		fi
@@ -2146,7 +2176,7 @@ ${str_title_start}$(translate "Currently %d online devices, details below" "$log
 
 	# 每列宽度 = 最大宽度 + 2*${str_space}
 	ip_max=$((ip_max + 2))
-	if [ "$has_usage" -eq 1 ]; then
+	if [ "$has_usage" -ne 0 ]; then
 		total_max=$((total_max + 2))
 	fi
 	time_online_max=$((time_online_max + 2))
@@ -2167,7 +2197,9 @@ ${str_title_start}$(translate "Currently %d online devices, details below" "$log
 
 	local header="${str_linefeed}${str_tab}"
 	header+=$(pad_field "$(translate "IP Address")" "$ip_max")"${str_space}"
-	if [ "$has_usage" -eq 1 ]; then
+	if [ "$has_usage" -eq 2 ]; then
+		header+=$(pad_field "↑ Upload / ↓ Download / Σ Total" "$total_max")
+	elif [ "$has_usage" -eq 1 ]; then
 		header+=$(pad_field "$(translate "Total Traffic")" "$total_max")
 	fi
 	header+=$(pad_field "$(translate "Uptime")" "$time_online_max")
@@ -2179,7 +2211,7 @@ ${str_title_start}$(translate "Currently %d online devices, details below" "$log
 	for i in "${!ips[@]}"; do
 		local line="${str_linefeed}${str_tab}"
 		line+=$(pad_field "${ips[i]}" "$ip_max")
-		if [ "$has_usage" -eq 1 ]; then
+		if [ "$has_usage" -ne 0 ]; then
 			line+=$(pad_field "${totals[i]}" "$total_max")
 		fi
 		line+=$(pad_field "${time_onlines[i]}" "$time_online_max")
