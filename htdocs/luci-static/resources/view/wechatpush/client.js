@@ -34,26 +34,6 @@ return view.extend({
 		return fs.read(devices_path).then(function (content) {
 			try {
 				var data = JSON.parse(content);
-				var wlanMap = {};
-
-				// 如果存在无线接口信息，解析为频段
-				if (data.wlan && Array.isArray(data.wlan)) {
-					data.wlan.forEach(function (wlan) {
-						wlanMap[wlan.interface] = wlan.band;
-					});
-				}
-				
-				// 解析设备的接口信息
-				data.devices.forEach(function (device) {
-					if (device.type) {
-						device.interface = device.type;
-					} else if (wlanMap[device.interface]) {
-						device.interface = wlanMap[device.interface];
-					} else {
-						device.interface = "LAN";
-					}
-				});
-
 				return { devices: data.devices };
 			} catch (e) {
 				console.error('Error parsing JSON:', e);
@@ -68,8 +48,8 @@ return view.extend({
 		}
 		var devices = data.devices.filter(device => device.status === 'online' || device.status === 'unknown');
 		var totalDevices = devices.length;
-		var headers = [_('Hostname'), _('IPv4 address'), _('MAC address'), _('Interfaces'), _('Connection Point'), _('Online time')];
-		var columns = ['name', 'ip', 'mac', 'interface', 'parent', 'uptime'];
+		var headers = [_('Hostname'), _('IPv4 address'), _('MAC address'), _('Connection Point'), _('Online time')];
+		var columns = ['name', 'ip', 'mac', 'parent', 'uptime'];
 		var visibleColumns = [];
 		var hasData = false;
 
@@ -225,14 +205,6 @@ return view.extend({
 				.device-table td[data-column="parent"] {
 					display: none;
 				}
-				/* 隐藏接口列的文本部分 */
-				.device-table td[data-column="interface"] span:not(.iface-icon) {
-					display: none;
-				}
-				/* 调整图标样式 */
-				.device-table td[data-column="interface"] .iface-icon {
-					margin-right: 0; /* 去掉图标右侧的间距 */
-				}
 			}
 		`;
 
@@ -278,22 +250,6 @@ return view.extend({
 							link.textContent = device['ip'];
 							link.target = '_blank';
 							cell.appendChild(link);
-						} else if (columns[i] === 'interface') {
-							var icon = document.createElement('span');
-							icon.classList.add('iface-icon');
-							if (device['interface'] === '2.4G') {
-								icon.innerHTML = '📶';
-							} else if (device['interface'] === '5G') {
-								icon.innerHTML = '🛜';
-							} else if (device['interface'] === 'WiFi') {
-								icon.innerHTML = '🛜';
-							}
-
-							var text = document.createElement('span');
-							text.textContent = device['interface'];
-
-							cell.appendChild(icon);
-							cell.appendChild(text);
 						} else if (columns[i] === 'parent') {
 							if (device['parent']) {
 								var parentDevice = devices.find(d => {
@@ -397,20 +353,12 @@ return view.extend({
 			return 0;
 		}
 
-		var interfaceDisplayMap = {
-			'2.4G': '2.4G',
-			'5G': '5G',
-			'WiFi': 'WiFi'
-		};
-
 		// 排序
 		function getValueForSorting(device, column) {
 			if (column === 'uptime') {
 				return parseInt(device['uptime']);
 			} else if (column === 'ip') {
 				return ipToNumber(device['ip']);
-			} else if (column === 'interface') {
-				return interfaceDisplayMap[device['interface']] || 'LAN';
 			} else if (column === 'parent') {
 				// 使用 parent 列的实际显示值进行排序
 				if (device['parent']) {
