@@ -5,6 +5,10 @@
 		"action": {
 			"type": "view",
 			"path": "wechatpush/status"
+		},
+		"depends": {
+			"acl": [ "luci-app-wechatpush" ],
+			"uci": { "wechatpush": true }
 		}
 	},
 

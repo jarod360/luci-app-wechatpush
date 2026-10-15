@@ -1,10 +1,10 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-wechatpush
-PKG_VERSION:=3.6.15
-PKG_RELEASE:=2
+PKG_VERSION:=3.6.13
+PKG_RELEASE:=
 
-LUCI_MAINTAINER:=tty228 <tty228@yeah.net>
+PKG_MAINTAINER:=tty228 <tty228@yeah.net>
 PKG_CONFIG_DEPENDS:= \
         CONFIG_PACKAGE_$(PKG_NAME)_Enable_Traffic_Monitoring \
         CONFIG_PACKAGE_$(PKG_NAME)_Enable_Local_Disk_Information_Detection \
@@ -28,7 +28,7 @@ config PACKAGE_$(PKG_NAME)_Enable_Traffic_Monitoring
         select PACKAGE_wrtbwmon
         depends on PACKAGE_$(PKG_NAME)
         default n
-config PACKAGE_$(PKG_NAME)_Enable_Local_Disk_Information_Detection
+config PACKAGE_$(PKG_NAME)_Local_Disk_Information_Detection
         bool "Local Disk Information Detection"
         help
                 If the lsblk package is not installed, the total disk capacity information might be inconsistent with actual values. When smartctl is not installed, information about disk temperature, power-on time, health status, and more will be unavailable. If you are using a virtual machine or have not installed a physical disk, this feature is typically unnecessary.
@@ -37,7 +37,7 @@ config PACKAGE_$(PKG_NAME)_Enable_Local_Disk_Information_Detection
         select PACKAGE_smartmontools-drivedb
         depends on PACKAGE_$(PKG_NAME)
         default n
-config PACKAGE_$(PKG_NAME)_Enable_Host_Information_Detection
+config PACKAGE_$(PKG_NAME)_Host_Information_Detection
         bool "Host Information Detection"
         help
                 When using a virtual machine and requiring information about the host machine's temperature and disk details, you need to install openssh-client and openssh-keygen for SSH connections.
@@ -47,53 +47,13 @@ config PACKAGE_$(PKG_NAME)_Enable_Host_Information_Detection
         default n
 endef
 
-# Keep only the main UCI configuration when the package is removed.
 define Package/$(PKG_NAME)/conffiles
 /etc/config/wechatpush
-endef
-
-# Remove runtime state created by the application before opkg removes package files.
-# OpenWrt's default_prerm invokes this hook from prerm-pkg, then disables/stops
-# every init script owned by this package.
-define Package/$(PKG_NAME)/prerm
-#!/bin/sh
-[ -n "$${IPKG_INSTROOT}" ] && exit 0
-[ "$${PKG_UPGRADE}" = "1" ] && exit 0
-
-# default_prerm runs this hook before its generic service-stop loop.
-[ -x /etc/init.d/wechatpush ] && /etc/init.d/wechatpush stop >/dev/null 2>&1 || true
-
-# Preserve unrelated root crontab jobs.
-if command -v crontab >/dev/null 2>&1; then
-	old_crontab=$$(crontab -l 2>/dev/null || true)
-	new_crontab=$$(printf '%s\n' "$$old_crontab" | grep -Fv \
-		-e '/usr/share/wechatpush/wechatpush' \
-		-e '/tmp/wechatpush/' || true)
-
-	if [ "$$old_crontab" != "$$new_crontab" ]; then
-		if [ -n "$$new_crontab" ]; then
-			printf '%s\n' "$$new_crontab" | crontab - 2>/dev/null || true
-		else
-			crontab -r 2>/dev/null || true
-		fi
-		[ -x /etc/init.d/cron ] && /etc/init.d/cron restart >/dev/null 2>&1 || true
-	fi
-fi
-
-# Remove all plugin-owned program/data directories and runtime state.
-# /etc/config/wechatpush is outside these paths and is the only conffile.
-rm -rf /tmp/wechatpush
-rm -rf /usr/share/wechatpush
-rm -rf /www/luci-static/resources/view/wechatpush
-
-# Clear non-persistent firewall rules created by the plugin.
-[ -x /etc/init.d/firewall ] && /etc/init.d/firewall reload >/dev/null 2>&1 || true
-
-# Invalidate LuCI and rpcd caches.
-rm -f /tmp/luci-indexcache.*
-rm -rf /tmp/luci-modulecache
-killall -HUP rpcd 2>/dev/null || true
-exit 0
+/usr/share/wechatpush/api/diy.json
+/usr/share/wechatpush/api/logo.jpg
+/usr/share/wechatpush/api/ipv4.list
+/usr/share/wechatpush/api/ipv6.list
+/usr/share/wechatpush/api/device_aliases.list
 endef
 
 include $(TOPDIR)/feeds/luci/luci.mk
