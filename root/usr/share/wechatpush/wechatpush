@@ -3198,6 +3198,42 @@ ${str_linefeed}${str_tab} - $(translate "Signal Strength:")${str_space}${str_spa
 	silent_run LockFile unlock
 }
 
+# 企业微信 access_token 获取。调用前 diy_send 已按配置导出代理环境变量。
+qywx_get_token() {
+	local response token errcode errmsg
+	response=$(curl -fsS --connect-timeout 15 --max-time 30 -G "${qywx_api_url}/cgi-bin/gettoken" --data-urlencode "corpid=${corpid}" --data-urlencode "corpsecret=${corpsecret}" 2>&1) || {
+		log_change "[ERROR] 企业微信 access_token 请求失败：${response}"
+		return 1
+	}
+	token=$(printf '%s' "$response" | jq -er 'select(.errcode == 0) | .access_token | select(type == "string" and length > 0)' 2>/dev/null) && {
+		printf '%s' "$token"
+		return 0
+	}
+	errcode=$(printf '%s' "$response" | jq -r '.errcode // "unknown"' 2>/dev/null)
+	errmsg=$(printf '%s' "$response" | jq -r '.errmsg // "invalid token response"' 2>/dev/null)
+	log_change "[ERROR] 企业微信 access_token 获取失败，errcode=${errcode}，errmsg=${errmsg}，响应：${response}"
+	return 1
+}
+
+# 企业微信图文消息封面素材上传，并校验 media_id。
+qywx_upload_media() {
+	local response media_id
+	[ -n "$qywx_access_token" ] || return 1
+	[ -r "$1" ] || {
+		log_change "[ERROR] 企业微信封面图片不可读：$1"
+		return 1
+	}
+	response=$(curl -fsS --connect-timeout 15 --max-time 60 -F "file=@$1" "${qywx_api_url}/cgi-bin/media/upload?access_token=${qywx_access_token}&type=image" 2>&1) || {
+		log_change "[ERROR] 企业微信封面素材上传请求失败：${response}"
+		return 1
+	}
+	media_id=$(printf '%s' "$response" | jq -er 'select(.errcode == 0) | .media_id | select(type == "string" and length > 0)' 2>/dev/null) || {
+		log_change "[ERROR] 企业微信封面素材上传失败，响应：${response}"
+		return 1
+	}
+	printf '%s' "$media_id"
+}
+
 # 推送
 diy_send() {
 	[ -z "$jsonpath" ] && return
@@ -3219,7 +3255,20 @@ diy_send() {
 		local -x NO_PROXY=''
 	fi
 
-	local diyurl=$(jq -r .url ${3}) && local diyurl=$(eval echo ${diyurl})
+	# 企业微信模板先获取并校验 Token，失败时立即中止，禁止生成空 token URL。
+	qywx_access_token=""
+	qywx_media_id=""
+	if [[ "${3}" == *"/qywx_mpnews.json" || "${3}" == *"/qywx_markdown.json" ]]; then
+		qywx_access_token=$(qywx_get_token) || return 1
+		[ -n "$qywx_access_token" ] || {
+			log_change "[ERROR] 企业微信 access_token 为空，取消发送"
+			return 1
+		}
+	fi
+	if [[ "${3}" == *"/qywx_mpnews.json" ]]; then
+		qywx_media_id=$(qywx_upload_media "$mediapath") || return 1
+	fi
+	local diyurl=$(jq -r .url "${3}") && local diyurl=$(eval echo "${diyurl}")
 	local type=$(jq -r '.type' ${3}) && local type=$(eval echo ${type})
 	local data=$(jq -r '.data' ${3}) && local data=$(eval echo ${data})
 	local content_type=$(jq -r '.content_type' ${3})
@@ -3227,12 +3276,21 @@ diy_send() {
 	! jq "$type" ${3} >${tempjsonpath} && log_change "[ERROR] $(translate "type:{ } field format error after variable substitution, please check for unescaped special characters or syntax errors in type:{ } field")" && return 1
 
 	if [[ "$diyurl" =~ ^https?:// ]]; then
-		local curl_response=$(run_with_tag curl --connect-timeout 30 --max-time 60 --retry 2 -X POST -H "$content_type" -d "$data" "${diyurl}")
+		local curl_response
+		curl_response=$(run_with_tag curl --connect-timeout 30 --max-time 60 --retry 2 -X POST -H "$content_type" -d "$data" "${diyurl}")
+		local RETVAL=$?
 	else
-		local command=$(jq -r '.command' ${3}) && local command=$(eval echo ${command})
-		local curl_response=$(run_with_tag jq -r "$command" "$data" | eval "$diyurl")
+		local command=$(jq -r '.command' "${3}") && local command=$(eval echo "${command}")
+		local curl_response
+		curl_response=$(run_with_tag jq -r "$command" "$data" | eval "$diyurl")
+		local RETVAL=$?
 	fi
-	local RETVAL=$?
+	if [ "$RETVAL" -eq 0 ] && [[ "${3}" == *"/qywx_mpnews.json" || "${3}" == *"/qywx_markdown.json" ]]; then
+		if ! printf '%s' "$curl_response" | jq -e '.errcode == 0' >/dev/null 2>&1; then
+			log_change "[ERROR] 企业微信消息发送失败，响应：${curl_response}"
+			RETVAL=1
+		fi
+	fi
 
 	if [ $RETVAL -ne 0 ] || [[ -n "$4" && "$4" == "test" ]]; then
 		[ $RETVAL -ne 0 ] && log_change "[ERROR] $(translate "Network or URL error, push failed, curl returned %s, please check the following debug information" "$RETVAL")"
