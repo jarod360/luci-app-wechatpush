@@ -57,15 +57,11 @@ endef
 # every init script owned by this package.
 define Package/$(PKG_NAME)/prerm
 #!/bin/sh
+[ -n "$${IPKG_INSTROOT}" ] && exit 0
+[ "$${PKG_UPGRADE}" = "1" ] && exit 0
 
-# Do not alter the running system when installing into an image/root directory.
-[ -n "$\${IPKG_INSTROOT}" ] && exit 0
-
-# Keep runtime state intact during an in-place package upgrade.
-[ "$\${PKG_UPGRADE}" = "1" ] && exit 0
-
-# The default_prerm wrapper has already disabled and stopped this package's init script.
-# Remove only this plugin's cron entries; preserve unrelated root crontab jobs.
+# default_prerm already disables and stops this package's init script.
+# Preserve unrelated root crontab jobs.
 if command -v crontab >/dev/null 2>&1; then
 	old_crontab=$$(crontab -l 2>/dev/null || true)
 	new_crontab=$$(printf '%s\n' "$$old_crontab" | grep -Fv \
@@ -82,18 +78,17 @@ if command -v crontab >/dev/null 2>&1; then
 	fi
 fi
 
-# Remove volatile/runtime-generated files. Preserve /etc/config/wechatpush.
+# Remove runtime state, preserving /etc/config/wechatpush.
 rm -rf /tmp/wechatpush
 rm -f /usr/share/wechatpush/errlog /usr/share/wechatpush/autoreboot_count
 
-# The application adds dynamic firewall rules; reload clears those non-persistent rules.
+# Clear non-persistent firewall rules created by the plugin.
 [ -x /etc/init.d/firewall ] && /etc/init.d/firewall reload >/dev/null 2>&1 || true
 
-# Invalidate LuCI caches so removed menu/ACL files are not served from stale cache.
+# Invalidate LuCI and rpcd caches.
 rm -f /tmp/luci-indexcache.*
 rm -rf /tmp/luci-modulecache
 killall -HUP rpcd 2>/dev/null || true
-
 exit 0
 endef
 
