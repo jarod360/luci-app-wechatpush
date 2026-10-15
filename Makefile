@@ -6,14 +6,12 @@ PKG_RELEASE:=
 
 PKG_MAINTAINER:=tty228 <tty228@yeah.net>
 PKG_CONFIG_DEPENDS:= \
-        CONFIG_PACKAGE_$(PKG_NAME)_Enable_Traffic_Monitoring \
         CONFIG_PACKAGE_$(PKG_NAME)_Enable_Local_Disk_Information_Detection \
         CONFIG_PACKAGE_$(PKG_NAME)_Enable_Host_Information_Detection
 
 LUCI_TITLE:=LuCI support for wechatpush
 LUCI_PKGARCH:=all
 LUCI_DEPENDS:=+iputils-arping +curl +jq +bash +luci-lua-runtime \
-        +PACKAGE_$(PKG_NAME)_Enable_Traffic_Monitoring:wrtbwmon \
         +PACKAGE_$(PKG_NAME)_Enable_Local_Disk_Information_Detection:lsblk \
         +PACKAGE_$(PKG_NAME)_Enable_Local_Disk_Information_Detection:smartmontools \
         +PACKAGE_$(PKG_NAME)_Enable_Local_Disk_Information_Detection:smartmontools-drivedb \
@@ -21,13 +19,6 @@ LUCI_DEPENDS:=+iputils-arping +curl +jq +bash +luci-lua-runtime \
         +PACKAGE_$(PKG_NAME)_Enable_Host_Information_Detection:openssh-keygen
 
 define Package/$(PKG_NAME)/config
-config PACKAGE_$(PKG_NAME)_Enable_Traffic_Monitoring
-        bool "Enable Traffic Monitoring"
-        help
-                The traffic statistics feature relies on the wrtbwmon package. This plugin may conflict with Routing/NAT, Flow Offloading, and proxy internet access plugins, potentially leading to an inability to retrieve traffic information.
-        select PACKAGE_wrtbwmon
-        depends on PACKAGE_$(PKG_NAME)
-        default n
 config PACKAGE_$(PKG_NAME)_Local_Disk_Information_Detection
         bool "Local Disk Information Detection"
         help
