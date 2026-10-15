@@ -3213,13 +3213,17 @@ diy_send() {
 	! jq "$type" ${3} >${tempjsonpath} && log_change "[ERROR] $(translate "type:{ } field format error after variable substitution, please check for unescaped special characters or syntax errors in type:{ } field")" && return 1
 
 	if [[ "$diyurl" =~ ^https?:// ]]; then
-		# 企业微信使用专用 API 基础地址，不再叠加通用 HTTP/SOCKS 代理；其他推送渠道保持原代理行为。
-		local -a proxy_args=()
-		case "$jsonpath" in
-			/usr/share/wechatpush/api/qywx_mpnews.json|/usr/share/wechatpush/api/qywx_markdown.json) ;;
-			*) [ -n "$proxy_address" ] && proxy_args=(-x "$proxy_address") ;;
-		esac
-		local curl_response=$(run_with_tag curl "${proxy_args[@]}" --connect-timeout 30 --max-time 60 --retry 2 -X POST -H "$content_type" -d "$data" "${diyurl}")
+		# 在本函数作用域内导出代理环境变量，使模板中的 Token、素材上传及消息发送请求统一使用 proxy_address。
+		# local -x 会在函数返回时恢复原环境，不影响其他推送流程。
+		if [ -n "$proxy_address" ]; then
+			local -x http_proxy="$proxy_address"
+			local -x https_proxy="$proxy_address"
+			local -x all_proxy="$proxy_address"
+			local -x HTTP_PROXY="$proxy_address"
+			local -x HTTPS_PROXY="$proxy_address"
+			local -x ALL_PROXY="$proxy_address"
+		fi
+		local curl_response=$(run_with_tag curl --connect-timeout 30 --max-time 60 --retry 2 -X POST -H "$content_type" -d "$data" "${diyurl}")
 	else
 		local command=$(jq -r '.command' ${3}) && local command=$(eval echo ${command})
 		local curl_response=$(run_with_tag jq -r "$command" "$data" | eval "$diyurl")
