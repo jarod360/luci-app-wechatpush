@@ -58,7 +58,7 @@ endef
 define Package/$(PKG_NAME)/prerm
 #!/bin/sh
 [ -n "$${IPKG_INSTROOT}" ] && exit 0
-[ "${PKG_UPGRADE}" = "1" ] && exit 0
+[ "$${PKG_UPGRADE}" = "1" ] && exit 0
 
 # default_prerm runs this hook before its generic service-stop loop.
 [ -x /etc/init.d/wechatpush ] && /etc/init.d/wechatpush stop >/dev/null 2>&1 || true
