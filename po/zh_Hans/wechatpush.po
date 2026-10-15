@@ -202,14 +202,6 @@ msgstr "图片缩略图文件路径"
 msgid "Supports JPG and PNG formats within 2MB <br> Optimal size: 900383 or 2.35:1"
 msgstr "只支持 2MB 以内 JPG、PNG 格式<br>最佳尺寸：900383 或 2.35:1"
 
-#: applications/luci-app-wechatpush/htdocs/luci-static/resources/view/wechatpush/config.js:183
-msgid "Trusted IP address"
-msgstr "可信 IP 地址"
-
-#: applications/luci-app-wechatpush/htdocs/luci-static/resources/view/wechatpush/config.js:187
-msgid "If the application was created after June 20, 2022, you need to set the trusted IP. This option should be used in conjunction with a proxy server."
-msgstr "如果是 2022 年 6 月 20 日之后新创建的应用，需设置可信 IP，该选项需配合代理服务器使用"
-
 #: applications/luci-app-wechatpush/htdocs/luci-static/resources/view/wechatpush/config.js:192
 msgid "topicIds(Mass sending)"
 msgstr "topicIds(群发)"
