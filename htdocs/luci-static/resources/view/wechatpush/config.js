@@ -390,7 +390,7 @@ return view.extend({
 
 		o = s.taboption('basic', form.Flag, 'qwrt_traffic_enable', _('Enable QWRT native traffic statistics'));
 		o.default = '0';
-		o.description = _('Enable traffic display using QWRT 2026.10.6 and newer native statistics. Do not enable on non-QWRT systems. Shows upload, download and total traffic on the online-device page and in push messages.');
+		o.description = _('仅 QWRT 2026.10.6 及以上版本开启流量显示，非 QWRT 版本请勿打开。开启后在线设备页面及推送显示上传、下载和总流量。');
 
 		o = s.taboption('basic', form.Flag, 'reset_regularly', _('Reset Traffic Data Every Day at Midnight'));
 		o.depends('qwrt_traffic_enable', '0');
