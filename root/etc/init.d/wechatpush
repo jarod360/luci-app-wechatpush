@@ -4,6 +4,17 @@ START=99
 STOP=90
 USE_PROCD=1
 
+# A service may not be registered with procd when stop/uninstall runs.
+# Suppress only service-delete errors; pass all other ubus calls through unchanged.
+__UBUS_BIN="$(command -v ubus || echo /bin/ubus)"
+ubus() {
+    if [ "$1" = "call" ] && [ "$2" = "service" ] && [ "$3" = "delete" ]; then
+        "$__UBUS_BIN" "$@" >/dev/null 2>&1 || true
+    else
+        "$__UBUS_BIN" "$@"
+    fi
+}
+
 dir="/tmp/wechatpush/"
 
 start_service() {
@@ -28,9 +39,11 @@ stop_service() {
             kill $child_pid
         done
     }
-    local pids=$(ps | grep "wechatpush" | grep -v grep | grep -v $$ | awk '{print $1}')
-	[ -n "$pids" ] && echo "$pids" | xargs kill 2>/dev/null
-    echo "Terminating wechatpush process..."
+    # Do not kill processes by the generic name "wechatpush": this also matches
+    # opkg's luci-app-wechatpush.prerm shell and can abort the uninstall itself.
+    # procd handles the main service process; the child_pid block above handles
+    # the detached log-monitor's children.
+    echo "Stopping wechatpush service..."
 }
 
 service_triggers() {
