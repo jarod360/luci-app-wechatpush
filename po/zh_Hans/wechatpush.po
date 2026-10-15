@@ -1639,7 +1639,7 @@ msgstr "仅在服务运行时生效"
 
 
 msgid "WeChat Work API Base URL"
-msgstr "企业微信代理 API 地址"
+msgstr "代理 API 地址"
 
 msgid "Optional API proxy base URL. Leave empty to use the official WeChat Work API. Enter only the base URL, without /cgi-bin/..."
 msgstr "可选的企业微信代理 API 基础地址。留空则使用企业微信官方 API。只填写基础地址，不要包含 /cgi-bin/..."
