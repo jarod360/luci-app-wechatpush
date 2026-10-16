@@ -67,7 +67,7 @@ return view.extend({
 								var item = traffic[mac];
 								if (item && (device.status === 'online' || device.status === 'unknown')) {
 									var up = Number(item.upload || 0), down = Number(item.download || 0);
-									device.usage = '↑ ' + self.formatTraffic(up) + ' / ↓ ' + self.formatTraffic(down) + ' / Σ ' + self.formatTraffic(up + down);
+									device.usage = window.innerWidth <= 767 ? '↓' + self.formatTraffic(down).replace(' ', '').replace('B', '') : '↑ ' + self.formatTraffic(up) + ' / ↓ ' + self.formatTraffic(down) + ' / Σ ' + self.formatTraffic(up + down);
 								} else if (device.status === 'online' || device.status === 'unknown') {
 									device.usage = '-';
 								}
