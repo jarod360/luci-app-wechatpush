@@ -140,8 +140,8 @@ return view.extend({
 			_('Using serverchan3 API, simple configuration, support push to ServerChan App'));
 		o.value('/usr/share/wechatpush/api/qywx_mpnews.json', _('WeChat Work Image Message'),
 			_('Using WeChat Work application message, more complex configuration, and starting from June 20, 2022, additional configuration for trusted IP is required. Trusted IP cannot be shared. This channel is no longer recommended.'));
-		o.value('/usr/share/wechatpush/api/qywx_markdown.json', _('WeChat Work Markdown Version'),
-			_('WeChat Work application message in plain text format, no need to click the title to view the content, same as above'));
+		o.value('/usr/share/wechatpush/api/qywx_markdown.json', _('WeChat Work Text Version'),
+			_('WeChat Work application text message, not Markdown; can be displayed as a normal text message in WeChat and WeCom, same as above'));
 		o.value('/usr/share/wechatpush/api/wxpusher.json', _('wxpusher'),
 			_('Another channel for WeChat push, the configuration is relatively simple, and only supports official accounts'));
 		o.value('/usr/share/wechatpush/api/pushplus.json', _('pushplus'),
