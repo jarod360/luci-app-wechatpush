@@ -2427,18 +2427,19 @@ current_device() {
 	# 各列之间保留两个显示单位；纯文字版自动换算全角与半角空格。
 	name_max=$((name_max + 2))
 	ip_max=$((ip_max + 2))
-	time_max=$((time_max + 2))
+	# 在线时间列额外增加一个显示占位，避免较长时长挤压到下一列。
+	time_max=$((time_max + 3))
 	[ "$has_usage" -eq 2 ] && traffic_max=$((traffic_max + 2))
 
 	if [ "$is_mpnews" -eq 1 ]; then
 		# 图文版使用真实 HTML 表格，避免依赖空格宽度模拟列对齐。
 		local table_html="<table border='0' cellpadding='3' cellspacing='0'><tr><th align='left'>${name_header}&nbsp;&nbsp;&nbsp;</th><th align='left'>${ip_header}&nbsp;&nbsp;&nbsp;</th><th align='left'>${time_header}"
-		[ "$has_usage" -eq 2 ] && table_html="${table_html}&nbsp;&nbsp;&nbsp;</th><th align='left'>${traffic_header}</th>" || table_html="${table_html}</th>"
+		[ "$has_usage" -eq 2 ] && table_html="${table_html}&nbsp;&nbsp;&nbsp;&nbsp;</th><th align='left'>${traffic_header}</th>" || table_html="${table_html}</th>"
 		table_html="${table_html}</tr>"
 		for i in "${!ips[@]}"; do
 			local line="<tr><td>${names[i]}&nbsp;&nbsp;&nbsp;</td><td>${ips[i]}&nbsp;&nbsp;&nbsp;</td><td>${time_onlines[i]}"
 			if [ "$has_usage" -eq 2 ]; then
-				line="${line}&nbsp;&nbsp;&nbsp;</td><td>${traffic_values[i]}</td>"
+				line="${line}&nbsp;&nbsp;&nbsp;&nbsp;</td><td>${traffic_values[i]}</td>"
 			else
 				line="${line}</td>"
 			fi
