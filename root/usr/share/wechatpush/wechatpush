@@ -666,6 +666,10 @@ rand() {
 # 日志输出函数，待设置调试等级
 log_change() {
 	local message="$1"
+	# 纯文字版日志前缀直接贴在日志正文前，不额外插入空格。
+	if [ "$disturb_text" = "【企业微信文字版】" ]; then
+		message="${message/【企业微信文字版】 /【企业微信文字版】}"
+	fi
 	echo "$(date "+%Y-%m-%d %H:%M:%S")" "${message}" >>"$logfile"
 }
 
@@ -2099,7 +2103,12 @@ current_device() {
 		local mac name time_up time_online traffic raw_traffic upload_bytes download_bytes total_bytes
 		mac=$(getmac "$ip")
 		name=$(getname "$ip" "$mac")
-		name=$(cut_str "$name" "16")
+		if [ "$is_mpnews" -eq 1 ]; then
+			# 图文版客户端名最多占 14 个显示列（7 个汉字）；截断时为省略号预留宽度。
+			name=$(cut_str "$name" "12")
+		else
+			name=$(cut_str "$name" "16")
+		fi
 		time_up=$(jq -r --arg ip "$ip" '.devices[] | select(.ip == $ip) | .uptime' "$devices_json")
 		time_online=$(format_device_uptime "$(( $(date +%s) - time_up ))")
 		traffic=""
@@ -2142,9 +2151,16 @@ current_device() {
 	done
 
 	local name_max ip_max time_max traffic_max
-	name_max=$(length_str "$name_header")
-	ip_max=$(length_str "$ip_header")
-	time_max=$(length_str "$time_header")
+	if [ "$is_mpnews" -eq 1 ]; then
+		# 图文版使用稳定的列宽基准，避免客户端名称长度改变整张表的排版。
+		name_max=14
+		ip_max=14
+		time_max=11
+	else
+		name_max=$(length_str "$name_header")
+		ip_max=$(length_str "$ip_header")
+		time_max=$(length_str "$time_header")
+	fi
 	traffic_max=$(length_str "$traffic_header")
 	for i in "${!ips[@]}"; do
 		local width
@@ -2168,14 +2184,19 @@ current_device() {
 		local field="$1" target_width="$2"
 		local current_width=$(length_str "$field")
 		local missing=$((target_width - current_width))
+		local pad_unit="$str_space"
+		[ -z "$pad_unit" ] && pad_unit=" "
 		local space_width=1
-		[ "$str_space" = "　" ] && space_width=2
+		[ "$pad_unit" = "　" ] && space_width=2
 		[ "$missing" -lt 0 ] && missing=0
-		local pad_count=$(((missing + space_width - 1) / space_width))
+		# 精确补齐显示宽度；全角空格前用半角空格处理奇数宽度差，避免列偏移。
+		local pad_count=$((missing / space_width))
+		local remainder=$((missing % space_width))
 		local pad=""
+		[ "$remainder" -gt 0 ] && pad=" "
 		local pad_index
 		for ((pad_index = 0; pad_index < pad_count; pad_index++)); do
-			pad="${pad}${str_space}"
+			pad="${pad}${pad_unit}"
 		done
 		printf "%s%s" "$field" "$pad"
 	}
