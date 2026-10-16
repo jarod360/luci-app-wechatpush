@@ -1,0 +1,88 @@
+-- ip2region XDB IPv4 lookup for Lua 5.1 / OpenWrt.
+-- Reads only the 512 KiB vector index and the matching segment/data records.
+-- IPv6 is intentionally handled by the caller through online providers.
+local db_path, ip_text = arg[1], arg[2]
+local function fail() os.exit(1) end
+if type(db_path) ~= "string" or db_path == "" or type(ip_text) ~= "string" or ip_text == "" then fail() end
+local octets = {}
+for part in (ip_text .. "."):gmatch("(.-)%.") do
+	if part == "" or not part:match("^%d+$") then fail() end
+	local value = tonumber(part)
+	if not value or value < 0 or value > 255 then fail() end
+	octets[#octets + 1] = value
+end
+if #octets ~= 4 then fail() end
+local file = io.open(db_path, "rb")
+if not file then fail() end
+local function close_and_fail()
+	if file then file:close(); file = nil end
+	fail()
+end
+local file_size = file:seek("end", 0)
+if not file_size or file_size < 256 + 524288 then close_and_fail() end
+local function read_at(offset, length)
+	if offset < 0 or length < 0 or offset + length > file_size then return nil end
+	if not file:seek("set", offset) then return nil end
+	local value = file:read(length)
+	if not value or #value ~= length then return nil end
+	return value
+end
+local function uint16_le(data, offset)
+	local a, b = data:byte(offset, offset + 1)
+	if not a or not b then return nil end
+	return a + b * 256
+end
+local function uint32_le(data, offset)
+	local a, b, c, d = data:byte(offset, offset + 3)
+	if not a or not b or not c or not d then return nil end
+	return a + b * 256 + c * 65536 + d * 16777216
+end
+local header = read_at(0, 256)
+if not header then close_and_fail() end
+local structure_version, ip_version = uint16_le(header, 1), uint16_le(header, 17)
+if structure_version ~= 2 and (structure_version ~= 3 or ip_version ~= 4) then close_and_fail() end
+local vector_index = read_at(256, 524288)
+if not vector_index then close_and_fail() end
+local vector_offset = (octets[1] * 256 + octets[2]) * 8
+local start_ptr = uint32_le(vector_index, vector_offset + 1)
+local end_ptr = uint32_le(vector_index, vector_offset + 5)
+if not start_ptr or not end_ptr or start_ptr == 0 or end_ptr == 0 or end_ptr < start_ptr or end_ptr + 14 > file_size then close_and_fail() end
+local function compare_ip(segment, offset)
+	for i = 1, 4 do
+		local indexed = segment:byte(offset + 5 - i)
+		if octets[i] > indexed then return 1 end
+		if octets[i] < indexed then return -1 end
+	end
+	return 0
+end
+local low, high = 0, math.floor((end_ptr - start_ptr) / 14)
+local data_ptr, data_len
+while low <= high do
+	local middle = math.floor((low + high) / 2)
+	local segment = read_at(start_ptr + middle * 14, 14)
+	if not segment then close_and_fail() end
+	if compare_ip(segment, 0) < 0 then
+		high = middle - 1
+	elseif compare_ip(segment, 4) > 0 then
+		low = middle + 1
+	else
+		data_len, data_ptr = uint16_le(segment, 9), uint32_le(segment, 11)
+		break
+	end
+end
+if not data_len or data_len == 0 or not data_ptr or data_ptr + data_len > file_size then close_and_fail() end
+local region = read_at(data_ptr, data_len)
+if not region then close_and_fail() end
+file:close()
+file = nil
+local fields = {}
+for field in (region .. "|"):gmatch("(.-)|") do
+	field = field:gsub("^%s*(.-)%s*$", "%1")
+	local lower = field:lower()
+	if field ~= "" and lower ~= "0" and lower ~= "null" and lower ~= "unknown" and lower ~= "n/a"
+		and field ~= "未知" and field ~= "保留地址" and field ~= "内网IP" then
+		fields[#fields + 1] = field
+	end
+end
+if #fields == 0 then fail() end
+io.write(table.concat(fields, " "))
