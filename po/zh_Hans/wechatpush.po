@@ -1609,7 +1609,7 @@ msgstr "MAC 信息文件无需更新"
 
 #: htdocs/luci-static/resources/view/wechatpush/config.js:363
 msgid "IP Attribution Local Database Path"
-msgstr "IP 归属地本地数据库路径"
+msgstr "IP归属地数据库路径"
 
 msgid "Location query timeout, current API: %s"
 msgstr "归属地获取超时，当前使用的 API 为 %s"
