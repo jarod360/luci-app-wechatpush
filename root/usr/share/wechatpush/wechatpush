@@ -2241,7 +2241,7 @@ up() {
 			[ -n "$content" ] && echo -n "$content" >>"${dir}/content"
 			# 事件记录用于生成推送标题，只保留设备名称；IP 继续保留在日志和正文详情中。
 			local up_title=$(translate "%s connected to your router" "$name")
-			printf '%s\n' "$up_title" >>"${dir}/device_events"
+			printf 'connected\t%s\t%s\n' "$name" "$up_title" >>"${dir}/device_events"
 		fi
 		silent_run LockFile unlock
 	fi
@@ -3510,7 +3510,7 @@ down_send() {
 			log_change "${disturb_text} ${down_event}"
 			touch "$log_marker"
 		fi
-		printf '%s\n' "$down_title" >>"${dir}/device_events"
+		printf 'disconnected\t%s\t%s\n' "$name" "$down_title" >>"${dir}/device_events"
 		offline_push_pending=1
 	done
 
