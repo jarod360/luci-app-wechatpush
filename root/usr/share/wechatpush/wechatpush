@@ -680,8 +680,7 @@ cut_str() {
 	printf '%s\n' "$result"
 }
 
-# 按模板生成字段间距：企业微信纯文字版统一只使用一个全角空格，
-# 其他推送模板仍保留原先指定的空格数量。
+# 按模板生成字段间距：兼容旧版固定间距调用。
 field_spaces() {
 	local count="${1:-1}" i
 	if [[ "$jsonpath" == *"/qywx_markdown.json" ]]; then
@@ -691,6 +690,43 @@ field_spaces() {
 	for ((i = 0; i < count; i++)); do
 		printf '%s' "$str_space"
 	done
+}
+
+# 按 UTF-8 显示宽度补齐字段：图文版使用 &nbsp;，纯文字版使用全角空格并按需补半角空格。
+pad_field() {
+	local field="$1" target_width="$2"
+	local current_width=$(length_str "$field")
+	local missing=$((target_width - current_width))
+	local pad_unit="$str_space"
+	[ -z "$pad_unit" ] && pad_unit=" "
+	local space_width=1
+	[ "$pad_unit" = "　" ] && space_width=2
+	[ "$missing" -lt 0 ] && missing=0
+	local pad_count=$((missing / space_width))
+	local remainder=$((missing % space_width))
+	local pad=""
+	[ "$remainder" -gt 0 ] && pad=" "
+	local pad_index
+	for ((pad_index = 0; pad_index < pad_count; pad_index++)); do
+		pad="${pad}${pad_unit}"
+	done
+	printf "%s%s" "$field" "$pad"
+}
+
+# 返回一组文本中的最大显示宽度，中文按双列、ASCII 按单列计算。
+max_display_width() {
+	local item max_width=0 width
+	for item in "$@"; do
+		width=$(length_str "$item")
+		[ "$width" -gt "$max_width" ] && max_width="$width"
+	done
+	printf '%s\n' "$max_width"
+}
+
+# 输出一条动态对齐的设备详情行。
+format_detail_line() {
+	local label="$1" value="$2" target_width="$3"
+	printf '%s%s - %s%s' "$str_linefeed" "$str_tab" "$(pad_field "$label" "$target_width")" "$value"
 }
 
 # 翻译
@@ -2106,17 +2142,18 @@ up() {
 				local content_title="${str_title_start}$(translate "New device connected")${str_title_end}"
 			fi
 
-			content="\
-${str_splitline}\
-${content_title}\
-${str_linefeed}${str_tab} - $(translate "Client Name:")$(field_spaces 5)${name}\
-${str_linefeed}${str_tab} - $(translate "Client IP:")$(field_spaces 4)${ip}\
-${str_linefeed}${str_tab} - $(translate "Client MAC:")$(field_spaces 4)${mac}\
-${str_linefeed}${str_tab} - $(translate "Network Interface:")$(field_spaces 5)${interface}"
-
 			local up_dbm=$(get_signal_dbm "$mac")
-			[ -n "$up_dbm" ] && content="${content}\
-${str_linefeed}${str_tab} - $(translate "Signal Strength:")$(field_spaces 2)${up_dbm} dBm"
+			local label_name="$(translate "Client Name:")"
+			local label_ip="$(translate "Client IP:")"
+			local label_mac="$(translate "Client MAC:")"
+			local label_interface="$(translate "Network Interface:")"
+			local label_signal="$(translate "Signal Strength:")"
+			local detail_width
+			detail_width=$(max_display_width "$label_name" "$label_ip" "$label_mac" "$label_interface" "$label_signal")
+			detail_width=$((detail_width + 2))
+
+			content="${str_splitline}${content_title}$(format_detail_line "$label_name" "$ip_name" "$detail_width")$(format_detail_line "$label_ip" "$ip" "$detail_width")$(format_detail_line "$label_mac" "$mac" "$detail_width")$(format_detail_line "$label_interface" "$interface" "$detail_width")"
+			[ -n "$up_dbm" ] && content="${content}$(format_detail_line "$label_signal" "$up_dbm dBm" "$detail_width")"
 
 			local up_log=$(translate "New device %s %s connected" "$name" "$ip")
 			[ -n "$up_dbm" ] && up_log="${up_log} dbm:${up_dbm}"
@@ -2296,27 +2333,13 @@ current_device() {
 		idx=$((idx + 1))
 	done
 
-	if [ "$is_text" -eq 1 ]; then
-		local list_header="${str_linefeed}${str_tab}${name_header}${str_space}${ip_header}${str_space}${time_header}"
-		[ "$has_usage" -eq 2 ] && list_header="${list_header}${str_space}${traffic_header}"
-		content="${content}${explain}${list_header}"
-		for i in "${!ips[@]}"; do
-			local line="${str_linefeed}${str_tab}${names[i]}${str_space}${ips[i]}${str_space}${time_onlines[i]}"
-			[ "$has_usage" -eq 2 ] && line="${line}${str_space}${traffic_values[i]}"
-			content="${content}${line}"
-		done
-	else
+	# 列标题去掉末尾冒号，并按表头和实际内容动态计算每一列宽度。
+	name_header="${name_header%:}"
+	name_header="${name_header%：}"
 	local name_max ip_max time_max traffic_max
-	if [ "$is_mpnews" -eq 1 ]; then
-		# 图文版使用稳定的列宽基准，避免客户端名称长度改变整张表的排版。
-		name_max=14
-		ip_max=14
-		time_max=11
-	else
-		name_max=$(length_str "$name_header")
-		ip_max=$(length_str "$ip_header")
-		time_max=$(length_str "$time_header")
-	fi
+	name_max=$(length_str "$name_header")
+	ip_max=$(length_str "$ip_header")
+	time_max=$(length_str "$time_header")
 	traffic_max=$(length_str "$traffic_header")
 	for i in "${!ips[@]}"; do
 		local width
@@ -2331,31 +2354,12 @@ current_device() {
 			[ "$width" -gt "$traffic_max" ] && traffic_max=$width
 		fi
 	done
+	# 各列之间保留两个显示单位；纯文字版自动换算全角与半角空格。
 	name_max=$((name_max + 2))
 	ip_max=$((ip_max + 2))
 	time_max=$((time_max + 2))
 	[ "$has_usage" -eq 2 ] && traffic_max=$((traffic_max + 2))
 
-	pad_field() {
-		local field="$1" target_width="$2"
-		local current_width=$(length_str "$field")
-		local missing=$((target_width - current_width))
-		local pad_unit="$str_space"
-		[ -z "$pad_unit" ] && pad_unit=" "
-		local space_width=1
-		[ "$pad_unit" = "　" ] && space_width=2
-		[ "$missing" -lt 0 ] && missing=0
-		# 精确补齐显示宽度；全角空格前用半角空格处理奇数宽度差，避免列偏移。
-		local pad_count=$((missing / space_width))
-		local remainder=$((missing % space_width))
-		local pad=""
-		[ "$remainder" -gt 0 ] && pad=" "
-		local pad_index
-		for ((pad_index = 0; pad_index < pad_count; pad_index++)); do
-			pad="${pad}${pad_unit}"
-		done
-		printf "%s%s" "$field" "$pad"
-	}
 	local list_header="${str_linefeed}${str_tab}"
 	list_header+=$(pad_field "$name_header" "$name_max")
 	list_header+=$(pad_field "$ip_header" "$ip_max")
@@ -2370,7 +2374,6 @@ current_device() {
 		[ "$has_usage" -eq 2 ] && line+=$(pad_field "${traffic_values[i]}" "$traffic_max")
 		content="${content}${line}"
 	done
-	fi
 	[ -f "${dir}/send_pid" ] && echo "$content" >"$output_dir/current_device" && unset content
 }
 # 无人值守任务
@@ -3344,6 +3347,18 @@ down_send() {
 		[ -z "$ip_blackwhite" ] || [ "$ip_blackwhite" -ne "0" ] && continue
 
 		local name=$(getname "$ip" "$mac")
+		local label_name="$(translate "Client Name:")"
+		local label_ip="$(translate "Client IP:")"
+		local label_mac="$(translate "Client MAC:")"
+		local label_uptime="$(translate "Uptime:")"
+		local label_upload="$(translate "Upload Traffic:")"
+		local label_download="$(translate "Download Traffic:")"
+		local label_total="$(translate "Total Traffic:")"
+		local label_signal="$(translate "Signal Strength:")"
+		local detail_width
+		detail_width=$(max_display_width "$label_name" "$label_ip" "$label_mac" "$label_uptime" "$label_upload" "$label_download" "$label_total" "$label_signal")
+		detail_width=$((detail_width + 2))
+
 		local time_up=$(jq -r --arg ip "$ip" '.devices[] | select(.ip == $ip and .status == "offline") | .uptime' "$devices_json")
 		local ip_total="" raw_traffic upload_bytes download_bytes total_bytes
 		if [ "$qwrt_traffic_enable" = "1" ]; then
@@ -3353,40 +3368,21 @@ down_send() {
 				[[ "$upload_bytes" =~ ^[0-9]+$ ]] || upload_bytes=0
 				[[ "$download_bytes" =~ ^[0-9]+$ ]] || download_bytes=0
 				if [[ "$jsonpath" == *"/qywx_markdown.json" ]]; then
-					ip_total="${str_linefeed}${str_tab} - $(translate "Download Traffic:") $(format_traffic_bytes "$download_bytes")"
+					ip_total="$(format_detail_line "$label_download" "$(format_traffic_bytes "$download_bytes")" "$detail_width")"
 				elif [[ "$jsonpath" == *"/qywx_mpnews.json" ]]; then
-					ip_total="${str_linefeed}${str_tab} - $(translate "Upload Traffic:") $(format_traffic_bytes "$upload_bytes") / $(translate "Download Traffic:") $(format_traffic_bytes "$download_bytes")"
+					ip_total="$(format_detail_line "$label_upload" "$(format_traffic_bytes "$upload_bytes")" "$detail_width")$(format_detail_line "$label_download" "$(format_traffic_bytes "$download_bytes")" "$detail_width")"
 				else
 					total_bytes=$((upload_bytes + download_bytes))
-					ip_total="${str_linefeed}${str_tab} - $(translate "Upload Traffic:") $(format_traffic_bytes "$upload_bytes") / $(translate "Download Traffic:") $(format_traffic_bytes "$download_bytes") / $(translate "Total Traffic:") $(format_traffic_bytes "$total_bytes")"
+					ip_total="$(format_detail_line "$label_upload" "$(format_traffic_bytes "$upload_bytes")" "$detail_width")$(format_detail_line "$label_download" "$(format_traffic_bytes "$download_bytes")" "$detail_width")$(format_detail_line "$label_total" "$(format_traffic_bytes "$total_bytes")" "$detail_width")"
 				fi
 			fi
 		fi
 		local time1=$(date +%s)
 		local time1=$(time_for_humans $(expr ${time1} - ${time_up}))
-
-		if [ -z "$title" ]; then
-			title=$(translate "%s disconnected" "$name")
-			content_title="${str_splitline}${str_title_start}$(translate "Device Disconnected")${str_title_end}"
-		elif echo "$title" | grep -q "$(translate "disconnected")"; then
-			title="${name} ${title}"
-			content_title=""
-		else
-			title="$(translate "Device Status Changed")"
-			content_title="${str_splitline}${str_title_start}$(translate "Device Disconnected")${str_title_end}"
-		fi
-
-		content="${content}\
-${content_title}\
-${str_linefeed}${str_tab} - $(translate "Client Name:")$(field_spaces 5)${name}\
-${str_linefeed}${str_tab} - $(translate "Client IP:")$(field_spaces 4)${ip}\
-${str_linefeed}${str_tab} - $(translate "Client MAC:")$(field_spaces 4)${mac}${ip_total}\
-${str_linefeed}${str_tab} - $(translate "Uptime:")$(field_spaces 4)${time1}"
-
 		local down_dbm=$(get_signal_dbm "$mac")
-		[ -n "$down_dbm" ] && content="${content}\
-${str_linefeed}${str_tab} - $(translate "Signal Strength:")$(field_spaces 2)${down_dbm} dBm"
 
+		content="${content}${content_title}$(format_detail_line "$label_name" "$name" "$detail_width")$(format_detail_line "$label_ip" "$ip" "$detail_width")$(format_detail_line "$label_mac" "$mac" "$detail_width")${ip_total}$(format_detail_line "$label_uptime" "$time1" "$detail_width")"
+		[ -n "$down_dbm" ] && content="${content}$(format_detail_line "$label_signal" "$down_dbm dBm" "$detail_width")"
 		local down_log=$(translate "Device %s %s disconnected" "$name" "$ip")
 		[ -n "$down_dbm" ] && down_log="${down_log} dbm:${down_dbm}"
 		log_change "${disturb_text} ${down_log}"
