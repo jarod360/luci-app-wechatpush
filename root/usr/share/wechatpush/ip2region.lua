@@ -85,4 +85,24 @@ for field in (region .. "|"):gmatch("(.-)|") do
 	end
 end
 if #fields == 0 then fail() end
+
+-- ip2region 数据源可能在国家/地区前增加大洲字段。
+-- 识别到大洲时移除该字段；大陆记录若还包含县区字段，则只保留
+-- 国家、省级、市级和末尾的运营商/ASN，避免输出过细的行政区划。
+local continents = {
+	["亚洲"] = true, ["asia"] = true,
+	["欧洲"] = true, ["europe"] = true,
+	["非洲"] = true, ["africa"] = true,
+	["北美洲"] = true, ["north america"] = true,
+	["南美洲"] = true, ["south america"] = true,
+	["大洋洲"] = true, ["oceania"] = true,
+	["南极洲"] = true, ["antarctica"] = true
+}
+if continents[(fields[1] or ""):lower()] then
+	table.remove(fields, 1)
+	if #fields >= 5 then
+		fields = { fields[1], fields[2], fields[3], fields[#fields] }
+	end
+end
+
 io.write(table.concat(fields, " "))
