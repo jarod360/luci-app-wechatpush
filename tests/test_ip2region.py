@@ -45,14 +45,14 @@ with tempfile.TemporaryDirectory() as tmp:
     write_xdb(legacy_db, "中国|北京|北京|电信|CN")
     result = lookup(legacy_db)
     assert result.returncode == 0
-    assert result.stdout == "北京", result.stdout
+    assert result.stdout == "北京 北京", result.stdout
 
-    # Mainland records: omit continent and county, retain city and ISP.
+    # Mainland records: omit continent, country, county and ISP; retain province and city.
     mainland_db = tmp / "mainland.xdb"
     write_xdb(mainland_db, "亚洲|中国|宁夏回族自治区|中卫市|海原县|联通")
     result = lookup(mainland_db)
     assert result.returncode == 0
-    assert result.stdout == "中卫市", result.stdout
+    assert result.stdout == "宁夏回族自治区 中卫市", result.stdout
 
     # Hong Kong records: omit continent and district, retain city and ASN.
     hong_kong_db = tmp / "hong-kong.xdb"
