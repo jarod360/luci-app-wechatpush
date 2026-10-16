@@ -640,11 +640,12 @@ format_device_uptime() {
 }
 
 # 计算字符串显示宽度（按 UTF-8 字节边界计算，汉字/全角字符宽度为 2）
-# 获取 UTF-8 字符串中指定字节的数值；不能用 Bash 的 %d 字符常量处理 C locale 下的非 ASCII 单字节。
+# 获取 UTF-8 字符串中指定字节的数值，使用 Bash 内置 printf，避免依赖系统未必安装的 od。
 utf8_byte_value() {
+	local LC_ALL=C
 	local value
-	value=$(printf '%s' "$1" | od -An -tu1)
-	value=${value//[[:space:]]/}
+	[ -z "$1" ] && { printf '0'; return; }
+	printf -v value '%d' "'$1"
 	printf '%s' "${value:-0}"
 }
 
