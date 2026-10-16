@@ -2440,13 +2440,13 @@ current_device() {
 
 	if [ "$is_mpnews" -eq 1 ]; then
 		# 图文版使用真实 HTML 表格，避免依赖空格宽度模拟列对齐。
-		local table_html="<table border='0' cellpadding='3' cellspacing='0'><tr><th align='left'>${name_header}&nbsp;&nbsp;</th><th align='left'>${ip_header}&nbsp;&nbsp;</th><th align='left'>${time_header}"
-		[ "$has_usage" -eq 2 ] && table_html="${table_html}&nbsp;&nbsp;</th><th align='left'>${traffic_header}</th>" || table_html="${table_html}</th>"
+		local table_html="<table border='0' cellpadding='3' cellspacing='0'><tr><th align='left'>${name_header}&nbsp;&nbsp;&nbsp;&nbsp;</th><th align='left'>${ip_header}&nbsp;&nbsp;&nbsp;&nbsp;</th><th align='left'>${time_header}"
+		[ "$has_usage" -eq 2 ] && table_html="${table_html}&nbsp;&nbsp;&nbsp;&nbsp;</th><th align='left'>${traffic_header}</th>" || table_html="${table_html}</th>"
 		table_html="${table_html}</tr>"
 		for i in "${!ips[@]}"; do
-			local line="<tr><td>${names[i]}&nbsp;&nbsp;</td><td>${ips[i]}&nbsp;&nbsp;</td><td>${time_onlines[i]}"
+			local line="<tr><td>${names[i]}&nbsp;&nbsp;&nbsp;&nbsp;</td><td>${ips[i]}&nbsp;&nbsp;&nbsp;&nbsp;</td><td>${time_onlines[i]}"
 			if [ "$has_usage" -eq 2 ]; then
-				line="${line}&nbsp;&nbsp;</td><td>${traffic_values[i]}</td>"
+				line="${line}&nbsp;&nbsp;&nbsp;&nbsp;</td><td>${traffic_values[i]}</td>"
 			else
 				line="${line}</td>"
 			fi
