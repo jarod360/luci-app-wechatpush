@@ -3597,12 +3597,6 @@ diy_send() {
 
 	! jq "$type" ${3} >${tempjsonpath} && log_change "[ERROR] $(translate "type:{ } field format error after variable substitution, please check for unescaped special characters or syntax errors in type:{ } field")" && return 1
 
-	# 保存最近一次实际发送的正文和请求体，便于排查成功的设备事件推送。
-	# 不保存包含 access_token 的请求 URL，避免将凭据写入调试文件。
-	printf '%s\n%s\n' "$send_title" "$send_content" >"${dir}/debug_send_content"
-	cat "${tempjsonpath}" >"${dir}/debug_send_data"
-	chmod 600 "${dir}/debug_send_content" "${dir}/debug_send_data" 2>/dev/null
-
 	if [[ "$diyurl" =~ ^https?:// ]]; then
 		local curl_response
 		curl_response=$(run_with_tag curl --connect-timeout 30 --max-time 60 --retry 2 -X POST -H "$content_type" -d "$data" "${diyurl}")
