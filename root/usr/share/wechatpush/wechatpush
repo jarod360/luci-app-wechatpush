@@ -368,6 +368,15 @@ main() {
 
 	# 循环
 	while [ "$enable" -eq "1" ]; do
+		# 原生检测每轮重新读取这三个参数，LuCI 保存后无需重启服务即可生效。
+		if [ "$qwrt_online_enable" = "1" ]; then
+			local configured_up_timeout=$(uci get wechatpush.config.up_timeout 2>/dev/null)
+			local configured_down_timeout=$(uci get wechatpush.config.down_timeout 2>/dev/null)
+			local configured_retry_count=$(uci get wechatpush.config.timeout_retry_count 2>/dev/null)
+			[[ "$configured_up_timeout" =~ ^[0-9]+$ ]] && up_timeout="$configured_up_timeout"
+			[[ "$configured_down_timeout" =~ ^[0-9]+$ ]] && down_timeout="$configured_down_timeout"
+			[[ "$configured_retry_count" =~ ^[0-9]+$ ]] && timeout_retry_count="$configured_retry_count"
+		fi
 		deltemp
 		loop_now=$(date +%s)
 		run_regular_tasks=1
