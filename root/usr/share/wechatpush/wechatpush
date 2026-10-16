@@ -1114,15 +1114,16 @@ getinterfaceuptime() {
 get_ip_attribution() {
 	ip="$1"
 	jq -e --arg ip "$ip" '.devices[] | select(.ip == $ip)' "$devices_json" >/dev/null 2>&1 && echo "本地局域网" && return
+	# 按 ip_attribution.list 文件顺序依次查询；当前服务无有效结果时再尝试下一项。
 	local ip_attribution_urls=$(cat /usr/share/wechatpush/api/ip_attribution.list)
-	local sorted_attribution_urls=$(echo "$ip_attribution_urls" | awk 'BEGIN {srand()} {print rand() "\t" $0}' | sort -k1,1n | cut -f2-)
 	local ip_attribution_url
 	while IFS= read -r ip_attribution_url; do
+		[ -z "$ip_attribution_url" ] && continue
 		local login_ip_attribution=$(eval curl --connect-timeout 2 -m 2 -k -s "$ip_attribution_url" 2>/dev/null)
 		#logfile=logfile="${dir}/wechatpush.log" # 此处保留排查时使用，增加日志调试等级后再加入 ip_attribution_url
 		#[ -z "$login_ip_attribution" ] && echo "$(date "+%Y-%m-%d %H:%M:%S") [DEBUG] $(translate "Location query timeout, current API: %s" "$ip_attribution_url")" >> "${logfile}"
 		[ -n "$login_ip_attribution" ] && echo "$login_ip_attribution" && break
-	done <<<"$sorted_attribution_urls"
+	done <<<"$ip_attribution_urls"
 }
 
 # 查询 NetBIOS
@@ -2269,9 +2270,19 @@ down() {
 	[ -z "$ip" ] && return 1
 	local mac=$(getmac "$ip")
 
-	tmp_timeout=$down_timeout && tmp_retry_count=$timeout_retry_count
-	[ -n "$only_timeout_push" ] && blackwhitelist "$mac"
-	local ip_blackwhite=$? && [ "$ip_blackwhite" -ne "0" ] && tmp_timeout=10 && tmp_retry_count=2
+	# 默认使用页面配置；仅在“仅推送超时设备”开关明确开启时执行 MAC 名单过滤。
+	local tmp_timeout="$down_timeout"
+	local tmp_retry_count="$timeout_retry_count"
+	local ip_blackwhite=0
+	if [ "$only_timeout_push" = "1" ]; then
+		blackwhitelist "$mac"
+		ip_blackwhite=$?
+	fi
+	# 名单外设备仍按内置快速检测参数判断，名单内设备使用页面自定义参数。
+	if [ "$ip_blackwhite" -ne 0 ]; then
+		tmp_timeout=10
+		tmp_retry_count=2
+	fi
 	getping "$ip" "$mac" "$tmp_timeout" "$tmp_retry_count"
 	local ping_online=$?
 	silent_run LockFile lock
