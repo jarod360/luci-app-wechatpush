@@ -1034,7 +1034,6 @@ getping() {
 	local retry_count="$4"
 	local interface=""
 	local wlan_online=""
-	local wifi_if=""
 	local neighbor_line=""
 	local neighbor_state=""
 	local neighbor_mac=""
@@ -1047,16 +1046,13 @@ getping() {
 	[[ "$retry_count" =~ ^[0-9]+$ ]] || retry_count=1
 	[ "$retry_count" -lt 1 ] && retry_count=1
 
-	# 使用实际 IP 查询接口；同时参考 LuCI 概览中使用的无线关联状态。
+	# 使用实际 IP 查询接口；优先从本轮缓存的无线关联列表判断，避免对每个客户端重复调用 iwinfo。
 	interface=$(getinterface "$ip" "$mac")
 	if [ -n "$mac" ] && [ "$mac" != "unknown" ]; then
-		for wifi_if in $wlan_interface; do
-			if iwinfo "$wifi_if" assoclist 2>/dev/null | grep -qiF "$mac"; then
-				wlan_online=1
-				break
-			fi
-		done
-		# 兼容未提供 iwinfo assoclist 的无线驱动。
+		if [ -f "${dir}/wifi_associated_macs" ] && grep -qiFx "$mac" "${dir}/wifi_associated_macs"; then
+			wlan_online=1
+		fi
+		# 兼容缓存不可用或无线驱动未列入 wlan_interface 的情况。
 		if [ -z "$wlan_online" ] && [ "$iw_version" ] && [ -n "$interface" ]; then
 			iw dev "$interface" station dump 2>/dev/null | grep -i -w "$mac" | grep -q "Station" && wlan_online=1
 		fi
@@ -1935,8 +1931,21 @@ getmikrotik() {
 	fi
 }
 
+# 刷新 LuCI 概览同类的无线关联设备列表，避免每个客户端重复调用 iwinfo。
+refresh_wifi_associations() {
+	local cache="${dir}/wifi_associated_macs"
+	local tmp="${dir}/wifi_associated_macs.tmp"
+	local wifi_if
+	: >"$tmp"
+	for wifi_if in $wlan_interface; do
+		iwinfo "$wifi_if" assoclist 2>/dev/null | grep -Eio '([[:xdigit:]]{2}:){5}[[:xdigit:]]{2}' >>"$tmp"
+	done
+	mv "$tmp" "$cache"
+}
+
 # 在线设备列表
 first() {
+	refresh_wifi_associations
 	# 注：此处为后台任务，无法操作父进程变量，故每个线程结束后都必须保存变量到文件
 	# 耗时太长，定时推送不再检查
 	local IPLIST=$(jq -r '.devices[] | select(.status == "online" or .status == "unknown") | .ip' "$devices_json" | sort -u)
@@ -2008,7 +2017,7 @@ up() {
 			# 删除当前 IP 对应的键值，重新写入，否则要启用 unique_by(.ip) 去重
 			jq --arg ip "$ip" 'del(.devices[] | select(.ip == $ip))' "$devices_json" >"$tmp_devices_json" && mv "$tmp_devices_json" "$devices_json"
 			local name=$(getname "$ip" "$mac")
-			local interface=$(getinterface "ip" "$mac")
+			local interface=$(getinterface "$ip" "$mac")
 			local http_access=$(check_http_access "$ip")
 			new_device='{
 				"name": "'"${name}"'",
@@ -2090,7 +2099,7 @@ down() {
 	# 更新设备信息
 	else
 		local name=$(getname "$ip" "$mac")
-		local interface=$(getinterface "ip" "$mac")
+		local interface=$(getinterface "$ip" "$mac")
 
 		if ! jq -e --arg ip "$ip" --arg mac "$mac" --arg name "$name" --arg interface "$interface" '.devices[] | select(.ip == $ip and (.mac | ascii_downcase) == ($mac | ascii_downcase) and .name == $name and .interface == $interface) | .ip' "$devices_json" >/dev/null; then
 			jq --arg ip "$ip" --arg new_mac "$mac" --arg new_name "$name" --arg new_interface "$interface" '
