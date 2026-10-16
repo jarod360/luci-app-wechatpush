@@ -2185,8 +2185,19 @@ up() {
 
 			[ -f "${dir}/content" ] && local content=$(cat "${dir}/content")
 
-			# 所有在线/离线事件使用同一批次标题，具体设备状态逐台写入正文。
-			local title="$(translate "Device status changed")"
+			# 新设备连接沿用原有标题语义；仅详情行使用统一的宽度对齐格式。
+			local title
+			local content_title="${str_title_start}$(translate "New device connected")${str_title_end}"
+			if [ -f "${dir}/title" ]; then
+				local previous_title=$(cat "${dir}/title")
+				if echo "$previous_title" | grep -q "$(translate "connected to your router")"; then
+					title="$previous_title"
+				else
+					title="$(translate "Device status changed")"
+				fi
+			else
+				title=$(translate "%s connected to your router" "$name")
+			fi
 
 			local up_dbm=$(get_signal_dbm "$mac")
 			local label_name="$(translate "Client Name:")"
@@ -2200,9 +2211,9 @@ up() {
 
 			local detail_fields=("$label_name" "$name" "$label_ip" "$ip" "$label_mac" "$mac" "$label_interface" "$interface")
 			[ -n "$up_dbm" ] && detail_fields+=("$label_signal" "$up_dbm dBm")
-			local up_event=$(translate "New device %s %s connected" "$name" "$ip")
-			content="${str_splitline}${str_linefeed}${str_tab} - ${up_event}$(format_detail_block "$detail_width" "${detail_fields[@]}")"
+			content="${str_splitline}${content_title}$(format_detail_block "$detail_width" "${detail_fields[@]}")"
 
+			local up_event=$(translate "New device %s %s connected" "$name" "$ip")
 			[ -n "$up_dbm" ] && up_event="${up_event} dbm:${up_dbm}"
 			log_change "${disturb_text} ${up_event}"
 
