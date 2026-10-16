@@ -1607,6 +1607,7 @@ msgstr "设备 MAC 信息文件处理完成"
 msgid "MAC information file does not need updating"
 msgstr "MAC 信息文件无需更新"
 
+#: htdocs/luci-static/resources/view/wechatpush/config.js:363
 msgid "IP Attribution Local Database Path"
 msgstr "IP 归属地本地数据库路径"
 
