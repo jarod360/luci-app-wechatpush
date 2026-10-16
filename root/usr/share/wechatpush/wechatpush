@@ -112,7 +112,9 @@ read_config() {
 	[ -z "$server_port" ] && server_port="22"
 	output_dir="${dir}/json_output"
 	mkdir -p "$output_dir"
-	if (echo "$lite_enable" | grep -q "content") || [ -z "$jsonpath" ]; then
+	# 企业微信图文消息必须保留 HTML 标题标签，确保正文中的所有标题文字加粗。
+	# 其他推送渠道继续遵循原有 lite_enable 精简格式逻辑。
+	if { (echo "$lite_enable" | grep -q "content") && [[ "$jsonpath" != *"/qywx_mpnews.json" ]]; } || [ -z "$jsonpath" ]; then
 		str_title_start="" && str_title_end="" && str_splitline="" && str_linefeed="" && str_tab=""
 	else
 		read_json "str_title_start" "$jsonpath"
