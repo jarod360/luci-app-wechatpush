@@ -1341,10 +1341,10 @@ qwrt_traffic_for_ip() {
 	elif [ "$mode" = "download" ]; then
 		printf '%s' "$(format_traffic_bytes "$download")"
 	elif [ "$mode" = "mpnews" ]; then
-		printf '↑ %s / ↓ %s' "$(format_traffic_bytes "$upload")" "$(format_traffic_bytes "$download")"
+		printf '↑%s/↓%s' "$(format_traffic_bytes "$upload")" "$(format_traffic_bytes "$download")"
 	else
 		total=$((upload + download))
-		printf '↑ %s / ↓ %s / Σ %s' "$(format_traffic_bytes "$upload")" "$(format_traffic_bytes "$download")" "$(format_traffic_bytes "$total")"
+		printf '↑%s/↓%s/Σ%s' "$(format_traffic_bytes "$upload")" "$(format_traffic_bytes "$download")" "$(format_traffic_bytes "$total")"
 	fi
 }
 
@@ -2377,22 +2377,22 @@ current_device() {
 			fi
 			if [ "$is_mpnews" -eq 1 ]; then
 				if [ -n "$upload_bytes" ]; then
-					traffic="↑ $(format_traffic_bytes "$upload_bytes") / ↓ $(format_traffic_bytes "$download_bytes")"
+					traffic="↑$(format_traffic_bytes "$upload_bytes")/↓$(format_traffic_bytes "$download_bytes")"
 				else
-					traffic="↑ - / ↓ -"
+					traffic="↑-/↓-"
 				fi
 			elif [ "$is_text" -eq 1 ]; then
 				if [ -n "$download_bytes" ]; then
-					traffic="↓ $(format_traffic_bytes "$download_bytes")"
+					traffic="↓$(format_traffic_bytes "$download_bytes")"
 				else
-					traffic="↓ -"
+					traffic="↓-"
 				fi
 			else
 				if [ -n "$upload_bytes" ]; then
 					total_bytes=$((upload_bytes + download_bytes))
-					traffic="↑ $(format_traffic_bytes "$upload_bytes") / ↓ $(format_traffic_bytes "$download_bytes") / Σ $(format_traffic_bytes "$total_bytes")"
+					traffic="↑$(format_traffic_bytes "$upload_bytes")/↓$(format_traffic_bytes "$download_bytes")/Σ$(format_traffic_bytes "$total_bytes")"
 				else
-					traffic="↑ - / ↓ -"
+					traffic="↑-/↓-"
 				fi
 			fi
 		fi
