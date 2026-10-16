@@ -1120,9 +1120,14 @@ get_ip_attribution() {
 	while IFS= read -r ip_attribution_url; do
 		[ -z "$ip_attribution_url" ] && continue
 		local login_ip_attribution=$(eval curl --connect-timeout 2 -m 2 -k -s "$ip_attribution_url" 2>/dev/null)
+		# 空响应或 JSON null 均视为查询失败，继续尝试列表中的下一个服务。
+		case "$login_ip_attribution" in
+			""|"null"|"NULL") continue ;;
+		esac
 		#logfile=logfile="${dir}/wechatpush.log" # 此处保留排查时使用，增加日志调试等级后再加入 ip_attribution_url
 		#[ -z "$login_ip_attribution" ] && echo "$(date "+%Y-%m-%d %H:%M:%S") [DEBUG] $(translate "Location query timeout, current API: %s" "$ip_attribution_url")" >> "${logfile}"
-		[ -n "$login_ip_attribution" ] && echo "$login_ip_attribution" && break
+		echo "$login_ip_attribution"
+		break
 	done <<<"$ip_attribution_urls"
 }
 
@@ -2315,7 +2320,7 @@ down() {
 	# 离线，置入待验证区
 	if [ "$ping_online" -eq "1" ]; then
 		if [ "$qwrt_online_enable" = "1" ]; then
-			# 原生检测首次发现缺失时只进入待确认状态；后续按配置累计复查次数和离线时长。
+			# 原生检测首次失败计为第 1 次；达到配置次数且满足超时后转为 offline。
 			local now=$(date +%s)
 			local pending_since=$(jq -r --arg ip "$ip" '.devices[] | select(.ip == $ip) | .qwrt_offline_since // empty' "$devices_json")
 			local pending_retries=$(jq -r --arg ip "$ip" '.devices[] | select(.ip == $ip) | .qwrt_offline_retries // empty' "$devices_json")
