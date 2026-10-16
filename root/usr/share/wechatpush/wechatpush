@@ -2088,12 +2088,13 @@ current_device() {
 	local traffic_header=""
 	local is_mpnews=0
 	local is_text=0
+	# 先识别消息模板；图文列宽不应依赖是否开启了 QWRT 流量统计。
+	[[ "$jsonpath" == *"/qywx_mpnews.json" ]] && is_mpnews=1
+	[[ "$jsonpath" == *"/qywx_markdown.json" ]] && is_text=1
 	if [ "$has_usage" -eq 2 ]; then
-		if [[ "$jsonpath" == *"/qywx_mpnews.json" ]]; then
-			is_mpnews=1
+		if [ "$is_mpnews" -eq 1 ]; then
 			traffic_header="$(translate "Upload / Download")"
-		elif [[ "$jsonpath" == *"/qywx_markdown.json" ]]; then
-			is_text=1
+		elif [ "$is_text" -eq 1 ]; then
 			traffic_header="$(translate "Download Traffic:")"
 		else
 			traffic_header="$(translate "Upload / Download")"
