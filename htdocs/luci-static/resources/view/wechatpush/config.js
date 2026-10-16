@@ -388,7 +388,7 @@ return view.extend({
 		o.depends('oui_data', '1');
 		o.depends('oui_data', '2');
 
-		o = s.taboption('basic', form.Flag, 'qwrt_traffic_enable', _('Enable QWRT native traffic statistics'));
+		o = s.taboption('basic', form.Flag, 'qwrt_traffic_enable', _('QWRT native traffic statistics'));
 		o.default = '0';
 		o.description = _('仅 QWRT 2026.10.6 及以上版本开启，非 QWRT 版本请勿打开。启用后在线设备页面、推送、异常流量告警和无人值守低流量判断均使用 QWRT 原生累计流量。');
 
