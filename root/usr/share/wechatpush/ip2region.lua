@@ -100,7 +100,15 @@ local continents = {
 }
 if continents[(fields[1] or ""):lower()] then
 	table.remove(fields, 1)
-	if #fields >= 5 then
+	local country = (fields[1] or ""):lower()
+	if country == "中国香港" or country == "hong kong" or country == "hong kong sar"
+		or country == "中国澳门" or country == "macao" or country == "macau" then
+		-- 港澳记录常见格式为：国家/地区|区|市镇|运营商；只保留市镇。
+		if #fields >= 4 then
+			fields = { fields[1], fields[#fields - 1], fields[#fields] }
+		end
+	elseif #fields >= 5 then
+		-- 中国大陆记录常见格式为：国家|省|市|县区|运营商。
 		fields = { fields[1], fields[2], fields[3], fields[#fields] }
 	end
 end
