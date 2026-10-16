@@ -2108,6 +2108,7 @@ current_device() {
 			# 图文版客户端名最多占 14 个显示列（7 个汉字）；仅超宽时才为省略号预留宽度。
 			local name_width
 			name_width=$(length_str "$name")
+			name_width=${name_width:-0}
 			[ "$name_width" -gt 14 ] && name=$(cut_str "$name" "12")
 		else
 			name=$(cut_str "$name" "16")
