@@ -2303,7 +2303,9 @@ down() {
 			local pending_elapsed_check=$(($(date +%s) - pending_since_check))
 			if [ "$pending_count_check" -ge "$tmp_retry_count" ]; then
 				if [ "$pending_elapsed_check" -ge "$tmp_timeout" ]; then
+					silent_run LockFile lock
 					jq --arg ip "$ip" '.devices |= map(if .ip == $ip then .status = "offline" | del(.qwrt_offline_since, .qwrt_offline_retries) else . end)' "$devices_json" >"$tmp_devices_json" && mv "$tmp_devices_json" "$devices_json"
+					silent_run LockFile unlock
 				fi
 				return 1
 			fi
