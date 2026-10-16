@@ -43,7 +43,7 @@ wait_and_cat() {
 # 初始化设置信息
 read_config() {
 	get_config \
-		"enable" "lite_enable" "device_name" "proxy_address" "qywx_api_url" "sleeptime" "oui_data" "qwrt_traffic_enable" "debuglevel" "lang" \
+		"enable" "lite_enable" "device_name" "proxy_address" "qywx_api_url" "sleeptime" "oui_data" "qwrt_traffic_enable" "qwrt_online_enable" "debuglevel" "lang" \
 		"jsonpath" "sckey" "sc3key" "sc3uid" "sc3tags" "corpid" "userid" "agentid" "corpsecret" "mediapath" "wxpusher_apptoken" "wxpusher_uids" "wxpusher_topicIds" "pushplus_token" "wpush_apikey" "tg_api_server" "tg_token" "tg_chat_id" "tg_thread_id" "recipient_email" "smtp_host" "smtp_port" "smtp_tls" "smtp_starttls" "smtp_user" "smtp_passwordeval" "smtp_from" "smtp_from_full_name" \
 		"get_ipv4_mode" "ipv4_interface" "get_ipv6_mode" "ipv6_interface" \
 		"device_notification" "cpu_notification" "cpu_load_threshold" "temperature_threshold" \
@@ -1026,6 +1026,72 @@ check_http_access() {
 	return 1
 }
 
+# 缓存 QWRT 概览使用的 ARP 数据；其 /usr/libexec/luci-arp 默认就是读取 /proc/net/arp。
+refresh_qwrt_overview_arp() {
+	local cache="${dir}/qwrt_overview_arp"
+	local tmp="${cache}.tmp"
+
+	if [ -x /usr/libexec/luci-arp ]; then
+		/usr/libexec/luci-arp >"$tmp" 2>/dev/null
+	else
+		cat /proc/net/arp >"$tmp" 2>/dev/null
+	fi
+
+	[ -f "$tmp" ] || : >"$tmp"
+	mv "$tmp" "$cache"
+}
+
+# 复用 QWRT LuCI 概览的在线判定：只统计 br-lan、有效 IPv4、完整 ARP 标志及有效单播 MAC，
+# 最后按 MAC 判定；不做 ping/arping 主动探测。
+qwrt_overview_mac_online() {
+	local mac="$1"
+	local cache="${dir}/qwrt_overview_arp"
+
+	[ -n "$mac" ] && [ "$mac" != "unknown" ] || return 1
+	[ -f "$cache" ] || refresh_qwrt_overview_arp
+
+	LC_ALL=C awk -v target="$mac" '
+		function hex_value(s, i, c, n, digit) {
+			sub(/^0[xX]/, "", s)
+			n = 0
+			for (i = 1; i <= length(s); i++) {
+				c = tolower(substr(s, i, 1))
+				digit = index("0123456789abcdef", c) - 1
+				if (digit < 0)
+					return -1
+				n = n * 16 + digit
+			}
+			return n
+		}
+		function valid_ipv4(s, octets, count, i) {
+			count = split(s, octets, ".")
+			if (count != 4)
+				return 0
+			for (i = 1; i <= 4; i++) {
+				if (octets[i] !~ /^[0-9]+$/ || length(octets[i]) > 3 || octets[i] + 0 > 255)
+					return 0
+			}
+			return 1
+		}
+		BEGIN { target = tolower(target) }
+		NR > 1 && $6 == "br-lan" {
+			flags = hex_value($3)
+			current_mac = tolower($4)
+			if (flags < 0 || int(flags / 2) % 2 != 1 || !valid_ipv4($1))
+				next
+			if (current_mac !~ /^[[:xdigit:]][[:xdigit:]]:[[:xdigit:]][[:xdigit:]]:[[:xdigit:]][[:xdigit:]]:[[:xdigit:]][[:xdigit:]]:[[:xdigit:]][[:xdigit:]]:[[:xdigit:]][[:xdigit:]]$/)
+				next
+			if (current_mac == "00:00:00:00:00:00" || hex_value(substr(current_mac, 1, 2)) % 2 != 0)
+				next
+			if (current_mac == target) {
+				found = 1
+				exit
+			}
+		}
+		END { exit !found }
+	' "$cache"
+}
+
 # ping
 getping() {
 	local ip="$1"
@@ -1041,6 +1107,12 @@ getping() {
 	local arp_entry_count=0
 	local ip_ms=""
 	local probe_timeout=2
+
+	# 开启时严格复用 QWRT 概览的 ARP/MAC 规则，不执行原有主动探测。
+	if [ "$qwrt_online_enable" = "1" ]; then
+		qwrt_overview_mac_online "$mac"
+		return $?
+	fi
 
 	[[ "$timeout" =~ ^[0-9]+$ ]] && [ "$timeout" -gt 0 ] && [ "$timeout" -lt "$probe_timeout" ] && probe_timeout="$timeout"
 	[[ "$retry_count" =~ ^[0-9]+$ ]] || retry_count=1
@@ -1946,6 +2018,7 @@ refresh_wifi_associations() {
 # 在线设备列表
 first() {
 	refresh_wifi_associations
+	[ "$qwrt_online_enable" = "1" ] && refresh_qwrt_overview_arp
 	# 注：此处为后台任务，无法操作父进程变量，故每个线程结束后都必须保存变量到文件
 	# 耗时太长，定时推送不再检查
 	local IPLIST=$(jq -r '.devices[] | select(.status == "online" or .status == "unknown") | .ip' "$devices_json" | sort -u)

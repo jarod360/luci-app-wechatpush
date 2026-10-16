@@ -1640,6 +1640,9 @@ msgstr "可选的企业微信代理 API 基础地址。留空则使用企业微�
 msgid "QWRT native traffic statistics"
 msgstr "QWRT 原生流量统计"
 
+msgid "QWRT native online detection"
+msgstr "QWRT 原生在线检测"
+
 #: applications/luci-app-wechatpush/htdocs/luci-static/resources/view/wechatpush/client.js:93
 msgid "Details"
 msgstr "流量详情"

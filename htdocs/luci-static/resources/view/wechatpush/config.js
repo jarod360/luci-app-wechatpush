@@ -392,6 +392,9 @@ return view.extend({
 		o.default = '0';
 		o.description = _('仅 QWRT 2026.10.6 及以上版本开启，非 QWRT 版本请勿打开。启用后在线设备页面、推送、异常流量告警和无人值守低流量判断均使用 QWRT 原生累计流量。');
 
+		o = s.taboption('basic', form.Flag, 'qwrt_online_enable', _('QWRT native online detection'));
+		o.default = '0';
+		o.description = '仅适用于 QWRT 2026.10.6 及以上版本。开启后完全按 QWRT 概览的 ARP/MAC 规则判断在线状态，不再使用 ping/arping 主动探测。该选项独立于 QWRT 原生流量统计；关闭时保持原有在线检测逻辑。';
 
 		o = s.taboption('basic', form.Flag, 'prefer_client_page', _('Prefer displaying online devices'));
 		o.default = '1';
