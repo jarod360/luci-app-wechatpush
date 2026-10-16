@@ -2283,10 +2283,15 @@ down() {
 			local now=$(date +%s)
 			local pending_since=$(jq -r --arg ip "$ip" '.devices[] | select(.ip == $ip) | .qwrt_offline_since // empty' "$devices_json")
 			local pending_retries=$(jq -r --arg ip "$ip" '.devices[] | select(.ip == $ip) | .qwrt_offline_retries // empty' "$devices_json")
-			[[ "$pending_since" =~ ^[0-9]+$ ]] || pending_since="$now"
-			[[ "$pending_retries" =~ ^[0-9]+$ ]] || pending_retries=0
-			if [ "$pending_since" -ne "$now" ] || jq -e --arg ip "$ip" '.devices[] | select(.ip == $ip and has("qwrt_offline_since"))' "$devices_json" >/dev/null; then
+			local pending_exists=0
+			jq -e --arg ip "$ip" '.devices[] | select(.ip == $ip and has("qwrt_offline_since"))' "$devices_json" >/dev/null && pending_exists=1
+			if [ "$pending_exists" -eq 1 ]; then
+				[[ "$pending_since" =~ ^[0-9]+$ ]] || pending_since="$now"
+				[[ "$pending_retries" =~ ^[0-9]+$ ]] || pending_retries=0
 				pending_retries=$((pending_retries + 1))
+			else
+				pending_since="$now"
+				pending_retries=0
 			fi
 			local offline_elapsed=$((now - pending_since))
 			if [ "$pending_retries" -ge "$tmp_retry_count" ] && [ "$offline_elapsed" -ge "$tmp_timeout" ]; then
