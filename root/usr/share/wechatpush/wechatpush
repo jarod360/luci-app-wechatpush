@@ -508,8 +508,8 @@ main() {
 			local first_event=$(sed -n '1p' "${dir}/device_events")
 			local first_event_type first_event_name first_event_title
 			IFS=$'\t' read -r first_event_type first_event_name first_event_title <<<"$first_event"
-			local connected_event_count=$(awk -F '\\t' '$1 == "connected" { count++ } END { print count+0 }' "${dir}/device_events")
-			local disconnected_event_count=$(awk -F '\\t' '$1 == "disconnected" { count++ } END { print count+0 }' "${dir}/device_events")
+			local connected_event_count=$(awk -F '\t' '$1 == "connected" { count++ } END { print count+0 }' "${dir}/device_events")
+			local disconnected_event_count=$(awk -F '\t' '$1 == "disconnected" { count++ } END { print count+0 }' "${dir}/device_events")
 			if [ "$device_event_count" -eq 1 ]; then
 				title="$first_event_title"
 			elif [ "$connected_event_count" -eq "$device_event_count" ]; then
