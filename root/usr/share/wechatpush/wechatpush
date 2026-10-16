@@ -2193,11 +2193,18 @@ up() {
 
 			[ -f "${dir}/content" ] && local content=$(cat "${dir}/content")
 
-			# 新设备连接沿用原有标题语义；仅详情行使用统一的宽度对齐格式。
 			local title
 			local content_title="${str_title_start}$(translate "New device connected")${str_title_end}"
-			# 新设备连接标题使用统一文案，不在标题中拼接设备名或 IP；具体信息保留在正文。
-			title="$(translate "New device connected")"
+			if [ -f "${dir}/title" ]; then
+				local previous_title=$(cat "${dir}/title")
+				if echo "$previous_title" | grep -q "$(translate "connected to your router")"; then
+					title="$previous_title"
+				else
+					title="$(translate "Device status changed")"
+				fi
+			else
+				title=$(translate "%s connected to your router" "$name")
+			fi
 
 			local up_dbm=$(get_signal_dbm "$mac")
 			local label_name="$(translate "Client Name:")"
