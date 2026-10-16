@@ -526,8 +526,8 @@ main() {
 				title=$(printf '%s' "$title" | sed -E 's/ [0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$//')
 			fi
 			[ -n "$device_name" ] && title="【$device_name】$title"
-			# "仅推送标题"保留用于定时/系统通知；设备事件批次必须保留逐台状态正文。
-			[ ! -s "${dir}/device_events" ] && (echo "$lite_enable" | grep -q "content") && content="$title"
+			# 精简模式统一作用于所有推送类型；选择“只推送标题”时，设备事件也不再附带详情正文。
+			(echo "$lite_enable" | grep -q "content") && content="$title"
 			disturb
 			disturb_RETVAL=$?
 			if [ "$disturb_RETVAL" -eq 0 ]; then
@@ -2226,7 +2226,9 @@ up() {
 
 			[ -n "$title" ] && echo "$title" >"${dir}/title"
 			[ -n "$content" ] && echo -n "$content" >>"${dir}/content"
-			printf '%s\n' "$up_event" >>"${dir}/device_events"
+			# 事件记录用于生成推送标题，只保留设备名称；IP 继续保留在日志和正文详情中。
+			local up_title=$(translate "%s connected to your router" "$name")
+			printf '%s\n' "$up_title" >>"${dir}/device_events"
 		fi
 		silent_run LockFile unlock
 	fi
@@ -2307,8 +2309,8 @@ down() {
 
 # 当前设备列表
 current_device() {
-	# 离线通知明确要求附带在线设备清单，不受精简推送选项影响。
-	if [ "$1" != "offline" ] && [ "$1" != "event" ] && [ ! -f "${dir}/send_pid" ]; then
+	# 非定时推送统一遵循精简选项；默认未勾选时完整附带在线设备清单。
+	if [ ! -f "${dir}/send_pid" ]; then
 		(echo "$lite_enable" | grep -q "content") || (echo "$lite_enable" | grep -q "device") && return
 	fi
 	local logrow=$(jq '.devices | map(select(.status == "online")) | length' "$devices_json")
@@ -3547,12 +3549,8 @@ qywx_upload_media() {
 # 推送
 diy_send() {
 	[ -z "$jsonpath" ] && return
-	# 图文版离线标题由事件记录提供时间；发送前会移除标题内时间，再由模板统一追加一次。
-	if [[ "$jsonpath" == *"/qywx_mpnews.json" ]] && [[ "$1" == *"断开连接"* ]]; then
-		local nowtime=$(date "+%Y-%m-%d %H:%M:%S")
-	else
-		(! echo "$lite_enable" | grep -q "content") && (! echo "$lite_enable" | grep -q "nowtime") && local nowtime=$(date "+%Y-%m-%d %H:%M:%S")
-	fi
+	# “只推送标题”或“精简当前时间”均不在标题模板中追加当前时间，所有消息类型保持一致。
+	(! echo "$lite_enable" | grep -q "content") && (! echo "$lite_enable" | grep -q "nowtime") && local nowtime=$(date "+%Y-%m-%d %H:%M:%S")
 
 	! jq -r '.' ${3} >/dev/null 2>&1 && log_change "[ERROR] $(translate "JSON format error, not a standard JSON file, please check %s for unescaped special characters or syntax errors" "$3")" && return 1
 
