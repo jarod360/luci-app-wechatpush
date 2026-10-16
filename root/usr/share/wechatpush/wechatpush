@@ -1319,9 +1319,9 @@ format_traffic_bytes() {
 	local bytes="${1:-0}"
 	awk -v n="$bytes" 'BEGIN {
 		n += 0;
-		if (n >= 1073741824) printf "%.2f GB", n / 1073741824;
-		else if (n >= 1048576) printf "%.2f MB", n / 1048576;
-		else printf "%.2f KB", n / 1024;
+		if (n >= 1073741824) printf "%.2f G", n / 1073741824;
+		else if (n >= 1048576) printf "%.2f M", n / 1048576;
+		else printf "%.2f K", n / 1024;
 	}'
 }
 
@@ -3468,8 +3468,7 @@ down_send() {
 				fi
 			fi
 		fi
-		local time1=$(date +%s)
-		local time1=$(time_for_humans $(expr ${time1} - ${time_up}))
+		local time1=$(format_device_uptime "$(($(date +%s) - time_up))")
 		local down_dbm=$(get_signal_dbm "$mac")
 		detail_fields+=("$label_uptime" "$time1")
 		[ -n "$down_dbm" ] && detail_fields+=("$label_signal" "$down_dbm dBm")
