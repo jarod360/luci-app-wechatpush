@@ -32,6 +32,9 @@ jobs:
       - name: Checkout package repository
         uses: actions/checkout@v4
 
+      - name: Validate WeChat push Bash syntax
+        run: bash -n root/usr/share/wechatpush/wechatpush
+
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -199,6 +202,9 @@ jobs:
     steps:
       - name: Checkout package repository
         uses: actions/checkout@v4
+
+      - name: Validate WeChat push Bash syntax
+        run: bash -n root/usr/share/wechatpush/wechatpush
 
       - name: Install dependencies
         run: |
