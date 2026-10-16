@@ -2354,7 +2354,7 @@ current_device() {
 		if [ "$is_mpnews" -eq 1 ]; then
 			traffic_header="$(translate "Upload / Download")"
 		elif [ "$is_text" -eq 1 ]; then
-			traffic_header="$(translate "Download Traffic:")"
+			traffic_header="$(translate "Download")"
 		else
 			traffic_header="$(translate "Upload / Download")"
 		fi
