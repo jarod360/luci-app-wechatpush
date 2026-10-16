@@ -85,12 +85,12 @@ msgid "Using WeChat Work application message, more complex configuration, and st
 msgstr "使用 企业微信应用消息，配置较为麻烦，且 2022 年 6 月 20 日之后新创建的应用，需要额外配置可信 IP，可信 IP 不可公用，不再推荐此通道"
 
 #: applications/luci-app-wechatpush/htdocs/luci-static/resources/view/wechatpush/config.js:139
-msgid "WeChat Work Markdown Version"
-msgstr "企业微信 markdown 版"
+msgid "WeChat Work Text Version"
+msgstr "企业微信纯文字版"
 
 #: applications/luci-app-wechatpush/htdocs/luci-static/resources/view/wechatpush/config.js:140
-msgid "WeChat Work application message in plain text format, no need to click the title to view the content, same as above"
-msgstr "企业微信应用消息 纯文字版，无需点击标题查看内容，其他同上"
+msgid "WeChat Work application text message, not Markdown; can be displayed as a normal text message in WeChat and WeCom, same as above"
+msgstr "企业微信应用纯文本消息，不使用 Markdown，可在微信和企业微信客户端直接查看，其他配置同上"
 
 #: applications/luci-app-wechatpush/htdocs/luci-static/resources/view/wechatpush/config.js:142
 msgid "Another channel for WeChat push, the configuration is relatively simple, and only supports official accounts"
@@ -1643,3 +1643,6 @@ msgstr "启用 QWRT 原生流量统计"
 #: applications/luci-app-wechatpush/htdocs/luci-static/resources/view/wechatpush/client.js:93
 msgid "Details"
 msgstr "流量详情"
+
+msgid "Upload / Download"
+msgstr "上传 / 下载"
