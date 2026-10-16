@@ -2283,6 +2283,31 @@ down() {
 		tmp_timeout=10
 		tmp_retry_count=2
 	fi
+	# QWRT 原生检测按“总失败检测次数”计数，并将这些检测均匀安排在超时窗口内。
+	# 已达到配置次数但尚未达到超时时间时只等待，不再额外探测，避免多出一次检测。
+	if [ "$qwrt_online_enable" = "1" ]; then
+		local pending_since_check=$(jq -r --arg ip "$ip" '.devices[] | select(.ip == $ip) | .qwrt_offline_since // empty' "$devices_json")
+		local pending_count_check=$(jq -r --arg ip "$ip" '.devices[] | select(.ip == $ip) | .qwrt_offline_retries // empty' "$devices_json")
+		local pending_check_exists=0
+		jq -e --arg ip "$ip" '.devices[] | select(.ip == $ip and has("qwrt_offline_since"))' "$devices_json" >/dev/null && pending_check_exists=1
+		if [ "$pending_check_exists" -eq 1 ]; then
+			[[ "$pending_since_check" =~ ^[0-9]+$ ]] || pending_since_check=$(date +%s)
+			[[ "$pending_count_check" =~ ^[0-9]+$ ]] || pending_count_check=1
+			[ "$tmp_retry_count" -ge 1 ] 2>/dev/null || tmp_retry_count=1
+			[ "$tmp_timeout" -ge 0 ] 2>/dev/null || tmp_timeout=0
+			local pending_elapsed_check=$(($(date +%s) - pending_since_check))
+			if [ "$pending_count_check" -ge "$tmp_retry_count" ]; then
+				if [ "$pending_elapsed_check" -ge "$tmp_timeout" ]; then
+					jq --arg ip "$ip" '.devices |= map(if .ip == $ip then .status = "offline" | del(.qwrt_offline_since, .qwrt_offline_retries) else . end)' "$devices_json" >"$tmp_devices_json" && mv "$tmp_devices_json" "$devices_json"
+				fi
+				return 1
+			fi
+			local next_check_offset=$(( (tmp_timeout * pending_count_check + tmp_retry_count - 2) / (tmp_retry_count - 1) ))
+			if [ "$pending_elapsed_check" -lt "$next_check_offset" ]; then
+				return 1
+			fi
+		fi
+	fi
 	getping "$ip" "$mac" "$tmp_timeout" "$tmp_retry_count"
 	local ping_online=$?
 	silent_run LockFile lock
@@ -2298,11 +2323,12 @@ down() {
 			jq -e --arg ip "$ip" '.devices[] | select(.ip == $ip and has("qwrt_offline_since"))' "$devices_json" >/dev/null && pending_exists=1
 			if [ "$pending_exists" -eq 1 ]; then
 				[[ "$pending_since" =~ ^[0-9]+$ ]] || pending_since="$now"
-				[[ "$pending_retries" =~ ^[0-9]+$ ]] || pending_retries=0
+				[[ "$pending_retries" =~ ^[0-9]+$ ]] || pending_retries=1
 				pending_retries=$((pending_retries + 1))
 			else
 				pending_since="$now"
-				pending_retries=0
+				# 首次失败本身就是第 1 次检测，不再从 0 开始计数。
+				pending_retries=1
 			fi
 			local offline_elapsed=$((now - pending_since))
 			if [ "$pending_retries" -ge "$tmp_retry_count" ] && [ "$offline_elapsed" -ge "$tmp_timeout" ]; then
