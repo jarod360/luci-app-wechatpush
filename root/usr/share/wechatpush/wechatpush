@@ -504,7 +504,7 @@ main() {
 			if [ "$device_event_count" -eq 1 ]; then
 				title=$(sed -n '1p' "${dir}/device_events")
 			elif [ "$device_event_count" -gt 1 ]; then
-				title="$(translate "Device status changed")（${device_event_count}）"
+				title="$(translate "Device status changed")（${device_event_count}台）"
 			fi
 		fi
 
@@ -2180,7 +2180,6 @@ up() {
 
 			# 所有在线/离线事件使用同一批次标题，具体设备状态逐台写入正文。
 			local title="$(translate "Device status changed")"
-			local content_title="${str_title_start}$(translate "New device connected")${str_title_end}"
 
 			local up_dbm=$(get_signal_dbm "$mac")
 			local label_name="$(translate "Client Name:")"
@@ -2195,14 +2194,14 @@ up() {
 			local detail_fields=("$label_name" "$name" "$label_ip" "$ip" "$label_mac" "$mac" "$label_interface" "$interface")
 			[ -n "$up_dbm" ] && detail_fields+=("$label_signal" "$up_dbm dBm")
 			local up_event=$(translate "New device %s %s connected" "$name" "$ip")
-			content="${str_splitline}${content_title}${str_linefeed}${str_tab} - ${up_event}$(format_detail_block "$detail_width" "${detail_fields[@]}")"
+			content="${str_splitline}${str_linefeed}${str_tab} - ${up_event}$(format_detail_block "$detail_width" "${detail_fields[@]}")"
 
 			[ -n "$up_dbm" ] && up_event="${up_event} dbm:${up_dbm}"
 			log_change "${disturb_text} ${up_event}"
 
 			[ -n "$title" ] && echo "$title" >"${dir}/title"
 			[ -n "$content" ] && echo -n "$content" >>"${dir}/content"
-			printf '%s\\n' "$up_event" >>"${dir}/device_events"
+			printf '%s\n' "$up_event" >>"${dir}/device_events"
 		fi
 		silent_run LockFile unlock
 	fi
@@ -2414,6 +2413,8 @@ current_device() {
 			else
 				line="${line}</td>"
 			fi
+			table_html="${table_html}${line}</tr>"
+		done
 		table_html="${table_html}</table>"
 		content="${content}${explain}${str_linefeed}${table_html}${str_linefeed}"
 	else
@@ -3408,7 +3409,6 @@ down_send() {
 		local name=$(getname "$ip" "$mac")
 		# 主循环依赖 title 和 content 同时非空才会发送；离线事件必须设置标题。
 		[ -n "$title" ] || title="$(translate "Device status changed")"
-		local content_title="${str_title_start}$(translate "Device status changed")${str_title_end}"
 		local label_name="$(translate "Client Name:")"
 		local label_ip="$(translate "Client IP:")"
 		local label_mac="$(translate "Client MAC:")"
@@ -3456,7 +3456,7 @@ down_send() {
 			log_change "${disturb_text} ${down_event}"
 			touch "$log_marker"
 		fi
-		printf '%s\\n' "$down_event" >>"${dir}/device_events"
+		printf '%s\n' "$down_event" >>"${dir}/device_events"
 		offline_push_pending=1
 	done
 
