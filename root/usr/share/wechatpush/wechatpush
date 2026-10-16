@@ -57,6 +57,8 @@ read_config() {
 
 	# 企业微信 API 基础地址：未填写时回退到官方接口，移除末尾斜杠。
 	qywx_api_url="${qywx_api_url:-https://qyapi.weixin.qq.com}"
+	# 旧版配置文件升级时可能尚未包含该选项，默认使用用户提供的 XDB 路径。
+	ip2region_db_path="${ip2region_db_path:-/etc/config/lucky.daji/ipdb/ip2region_v4.xdb}"
 	while [[ "$qywx_api_url" == */ ]]; do qywx_api_url="${qywx_api_url%/}"; done
 
 	(echo "$device_notification" | grep -q "online") && notification_online="true"
