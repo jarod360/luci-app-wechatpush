@@ -360,6 +360,12 @@ return view.extend({
 		o.datatype = 'and(uinteger,min(10))';
 		o.description = _('Shorter intervals provide quicker response but consume more system resources.');
 
+		o = s.taboption('basic', form.Value, 'ip2region_db_path', _('IP Attribution Local Database Path'));
+		o.default = '/etc/config/lucky.daji/ipdb/ip2region_v4.xdb';
+		o.placeholder = '/etc/config/lucky.daji/ipdb/ip2region_v4.xdb';
+		o.rmempty = true;
+		o.description = _('选择本地数据库后，针对 Web 和 SSH 登录 IP 地址，优先使用本地 ip2region 数据库查询。本地数据库没有有效结果时，按照程序内置网址逐个查询。IPv6 地址始终使用在线查询。');
+
 		o = s.taboption('basic', cbiRichListValue, 'oui_data', _('MAC Device Database'));
 		o.value('', _('Close'),
 			_('Do not use MAC device database'));
