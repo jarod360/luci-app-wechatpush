@@ -43,7 +43,7 @@ wait_and_cat() {
 # 初始化设置信息
 read_config() {
 	get_config \
-		"enable" "lite_enable" "device_name" "proxy_address" "qywx_api_url" "sleeptime" "oui_data" "qwrt_traffic_enable" "qwrt_online_enable" "debuglevel" "lang" \
+		"ip2region_db_path" "enable" "lite_enable" "device_name" "proxy_address" "qywx_api_url" "sleeptime" "oui_data" "qwrt_traffic_enable" "qwrt_online_enable" "debuglevel" "lang" \
 		"jsonpath" "sckey" "sc3key" "sc3uid" "sc3tags" "corpid" "userid" "agentid" "corpsecret" "mediapath" "wxpusher_apptoken" "wxpusher_uids" "wxpusher_topicIds" "pushplus_token" "wpush_apikey" "tg_api_server" "tg_token" "tg_chat_id" "tg_thread_id" "recipient_email" "smtp_host" "smtp_port" "smtp_tls" "smtp_starttls" "smtp_user" "smtp_passwordeval" "smtp_from" "smtp_from_full_name" \
 		"get_ipv4_mode" "ipv4_interface" "get_ipv6_mode" "ipv6_interface" \
 		"device_notification" "cpu_notification" "cpu_load_threshold" "temperature_threshold" \
@@ -1112,9 +1112,20 @@ getinterfaceuptime() {
 
 # 查询 IP 归属地
 get_ip_attribution() {
-	ip="$1"
+	local ip="$1"
 	jq -e --arg ip "$ip" '.devices[] | select(.ip == $ip)' "$devices_json" >/dev/null 2>&1 && echo "本地局域网" && return
-	# 按 ip_attribution.list 文件顺序依次查询；当前服务无有效结果时再尝试下一项。
+
+	# IPv4 优先使用本地 ip2region XDB；IPv6 始终使用在线查询。
+	if [[ "$ip" != *:* ]] && [ -n "$ip2region_db_path" ] && [ -f "$ip2region_db_path" ] && command -v lua >/dev/null 2>&1; then
+		local local_ip_attribution
+		local_ip_attribution=$(lua /usr/share/wechatpush/ip2region.lua "$ip2region_db_path" "$ip" 2>/dev/null)
+		if [ -n "$local_ip_attribution" ]; then
+			echo "$local_ip_attribution"
+			return
+		fi
+	fi
+
+	# 本地数据库不存在、查询失败或没有有效结果时，按列表顺序逐个查询在线服务。
 	local ip_attribution_urls=$(cat /usr/share/wechatpush/api/ip_attribution.list)
 	local ip_attribution_url
 	while IFS= read -r ip_attribution_url; do
@@ -1124,8 +1135,6 @@ get_ip_attribution() {
 		case "$login_ip_attribution" in
 			""|"null"|"NULL") continue ;;
 		esac
-		#logfile=logfile="${dir}/wechatpush.log" # 此处保留排查时使用，增加日志调试等级后再加入 ip_attribution_url
-		#[ -z "$login_ip_attribution" ] && echo "$(date "+%Y-%m-%d %H:%M:%S") [DEBUG] $(translate "Location query timeout, current API: %s" "$ip_attribution_url")" >> "${logfile}"
 		echo "$login_ip_attribution"
 		break
 	done <<<"$ip_attribution_urls"
