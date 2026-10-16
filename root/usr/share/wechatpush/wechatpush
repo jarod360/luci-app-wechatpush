@@ -2289,9 +2289,10 @@ down() {
 
 # 当前设备列表
 current_device() {
-	[ ! -f "${dir}/send_pid" ] && {
+	# 离线通知明确要求附带在线设备清单，不受精简推送选项影响。
+	if [ "$1" != "offline" ] && [ ! -f "${dir}/send_pid" ]; then
 		(echo "$lite_enable" | grep -q "content") || (echo "$lite_enable" | grep -q "device") && return
-	}
+	fi
 	local logrow=$(jq '.devices | map(select(.status == "online")) | length' "$devices_json")
 	local has_usage=0
 	[ "$qwrt_traffic_enable" = "1" ] && has_usage=2
@@ -3475,7 +3476,7 @@ down_send() {
 	done
 
 	# 离线详情后附加当前在线设备数量及列表。
-	[ "$offline_push_pending" = "1" ] && current_device
+	[ "$offline_push_pending" = "1" ] && current_device offline
 
 	# 若全部离线设备都被关闭通知/黑白名单过滤，按原逻辑清除；待发送事件则留到发送成功后清理。
 	[ "$offline_push_pending" = "1" ] || clear_offline_devices
