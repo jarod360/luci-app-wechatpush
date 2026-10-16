@@ -9,4 +9,5 @@ config wechatpush "config"
     option thread_num '3'
 	option tg_api_server 'https://api.telegram.org'
 	option qywx_api_url ''
+	option ip2region_db_path '/etc/config/lucky.daji/ipdb/ip2region_v4.xdb'
 	option tg_chat_id ''
