@@ -1173,7 +1173,7 @@ check_http_access() {
 refresh_qwrt_overview_arp() {
 	local cache="${dir}/qwrt_overview_arp"
 	# 多个上线检测线程可能同时刷新快照，使用各自的临时文件再原子替换。
-	local tmp="${cache}.tmp.$"
+	local tmp="${cache}.tmp.${BASHPID}"
 
 	if [ -x /usr/libexec/luci-arp ]; then
 		/usr/libexec/luci-arp >"$tmp" 2>/dev/null
