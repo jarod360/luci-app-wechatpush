@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Small synthetic XDB fixture test for the Lua 5.1 IPv4 lookup helper."""
+"""Synthetic XDB fixture tests for the Lua 5.1 IPv4 lookup helper."""
 import pathlib
 import struct
 import subprocess
@@ -8,10 +8,10 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 HELPER = ROOT / "root/usr/share/wechatpush/ip2region.lua"
 IP = "1.2.3.4"
-REGION = "中国|北京|北京|电信|CN".encode("utf-8")
 
-with tempfile.TemporaryDirectory() as tmp:
-    db = pathlib.Path(tmp) / "test.xdb"
+
+def write_xdb(path, region):
+    region = region.encode("utf-8")
     header = bytearray(256)
     struct.pack_into("<H", header, 0, 2)  # XDB structure v2, IPv4
     vector = bytearray(256 * 256 * 8)
@@ -22,25 +22,53 @@ with tempfile.TemporaryDirectory() as tmp:
     segment = (
         struct.pack("<I", ip_value)
         + struct.pack("<I", ip_value)
-        + struct.pack("<H", len(REGION))
+        + struct.pack("<H", len(region))
         + struct.pack("<I", data_ptr)
     )
     vector_offset = (1 * 256 + 2) * 8
     struct.pack_into("<II", vector, vector_offset, segment_ptr, segment_ptr)
-    db.write_bytes(header + vector + segment + REGION)
+    path.write_bytes(header + vector + segment + region)
 
-    result = subprocess.run(
-        ["lua5.1", str(HELPER), str(db), IP],
-        check=True, capture_output=True, text=True,
-    )
-    assert result.stdout == "中国 北京 北京 电信 CN", result.stdout
 
-    missing = subprocess.run(
-        ["lua5.1", str(HELPER), str(db), "1.2.3.5"],
+def lookup(path, ip=IP):
+    return subprocess.run(
+        ["lua5.1", str(HELPER), str(path), ip],
         capture_output=True, text=True,
     )
+
+
+with tempfile.TemporaryDirectory() as tmp:
+    tmp = pathlib.Path(tmp)
+
+    # Legacy format without a continent field remains unchanged.
+    legacy_db = tmp / "legacy.xdb"
+    write_xdb(legacy_db, "中国|北京|北京|电信|CN")
+    result = lookup(legacy_db)
+    assert result.returncode == 0
+    assert result.stdout == "中国 北京 北京 电信 CN", result.stdout
+
+    # Mainland records: omit continent and county, retain city and ISP.
+    mainland_db = tmp / "mainland.xdb"
+    write_xdb(mainland_db, "亚洲|中国|宁夏回族自治区|中卫市|海原县|联通")
+    result = lookup(mainland_db)
+    assert result.returncode == 0
+    assert result.stdout == "中国 宁夏回族自治区 中卫市 联通", result.stdout
+
+    # Hong Kong records: omit continent but retain district/city and ASN.
+    hong_kong_db = tmp / "hong-kong.xdb"
+    write_xdb(
+        hong_kong_db,
+        "亚洲|中国香港|Kwai Tsing District|葵涌|DMIT Cloud Services AS906",
+    )
+    result = lookup(hong_kong_db)
+    assert result.returncode == 0
+    assert result.stdout == (
+        "中国香港 Kwai Tsing District 葵涌 DMIT Cloud Services AS906"
+    ), result.stdout
+
+    missing = lookup(legacy_db, "1.2.3.5")
     assert missing.returncode != 0 and not missing.stdout, (
         missing.returncode, missing.stdout, missing.stderr
     )
 
-print("ip2region Lua XDB fixture test passed")
+print("ip2region Lua XDB fixture tests passed")
