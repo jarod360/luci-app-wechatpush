@@ -1098,39 +1098,17 @@ getping() {
 	local mac="$2"
 	local timeout="$3"
 	local retry_count="$4"
-	local interface=""
-	local wlan_online=""
-	local neighbor_line=""
-	local neighbor_state=""
-	local neighbor_mac=""
-	local arp_interface=""
-	local arp_entry_count=0
-	local ip_ms=""
-	local probe_timeout=2
 
-	# 开启时严格复用 QWRT 概览的 ARP/MAC 规则，不执行原有主动探测。
+	# 开启时使用 QWRT 概览自己的 ARP/MAC 判断；关闭时继续执行下方原始检测代码。
 	if [ "$qwrt_online_enable" = "1" ]; then
 		qwrt_overview_mac_online "$mac"
 		return $?
 	fi
 
-	[[ "$timeout" =~ ^[0-9]+$ ]] && [ "$timeout" -gt 0 ] && [ "$timeout" -lt "$probe_timeout" ] && probe_timeout="$timeout"
-	[[ "$retry_count" =~ ^[0-9]+$ ]] || retry_count=1
-	[ "$retry_count" -lt 1 ] && retry_count=1
 
-	# 使用实际 IP 查询接口；优先从本轮缓存的无线关联列表判断，避免对每个客户端重复调用 iwinfo。
-	interface=$(getinterface "$ip" "$mac")
-	if [ -n "$mac" ] && [ "$mac" != "unknown" ]; then
-		if [ -f "${dir}/wifi_associated_macs" ] && grep -qiFx "$mac" "${dir}/wifi_associated_macs"; then
-			wlan_online=1
-		fi
-		# 兼容缓存不可用或无线驱动未列入 wlan_interface 的情况。
-		if [ -z "$wlan_online" ] && [ "$iw_version" ] && [ -n "$interface" ]; then
-			iw dev "$interface" station dump 2>/dev/null | grep -i -w "$mac" | grep -q "Station" && wlan_online=1
-		fi
-	fi
-
-	[ -n "$wlan_online" ] && {
+	local interface=$(getinterface "ip" "$mac")
+	[ "$iw_version" ] && [ "$interface" ] && wlan_online=$(iw dev ${interface} station dump 2>/dev/null | grep -i -w "$mac" | grep Station) >/dev/null 2>&1
+	[ "$wlan_online" ] && {
 		silent_run LockFile lock
 		jq --arg ip "$ip" --arg parent "Local" \
 			'.devices |= map(if .ip == $ip and (.parent | . != $parent) then .parent = $parent else . end)' \
@@ -1139,40 +1117,24 @@ getping() {
 		return 0
 	}
 
-	# Linux 邻居表中 REACHABLE 且 MAC 一致的条目可直接判为在线，避免不必要的探测。
-	arp_interface=$(awk -v ip="$ip" '$1 == ip && $6 != "" { print $6; exit }' /proc/net/arp 2>/dev/null)
-	[ -n "$arp_interface" ] && interface="$arp_interface"
-	if [ -n "$interface" ] && command -v ip >/dev/null 2>&1; then
-		neighbor_line=$(ip neigh show to "$ip" dev "$interface" 2>/dev/null | head -n 1)
-		neighbor_state=$(printf '%s\n' "$neighbor_line" | awk '{print $NF}')
-		if [ "$neighbor_state" = "REACHABLE" ]; then
-			neighbor_mac=$(printf '%s\n' "$neighbor_line" | awk '{for (i=1; i<NF; i++) if ($i == "lladdr") {print $(i+1); exit}}')
-			if [ -z "$neighbor_mac" ] || [ "$mac" = "unknown" ] || [ "${neighbor_mac,,}" = "${mac,,}" ]; then
-				return 0
-			fi
-		fi
-	fi
-
-	if [ -n "$interface" ] && [ -n "$mac" ] && [ "$mac" != "unknown" ]; then
-		arp_entry_count=$(awk -v mac="$mac" 'tolower($4) == tolower(mac) && $3 != "0x0" {count++} END {print count+0}' /proc/net/arp 2>/dev/null)
-	fi
-
+	interface=$(cat /proc/net/arp | grep -w "$ip" | awk '{print $6}' | grep -v "^$" | sort -u | head -n1)
 	for i in $(seq 1 "$retry_count"); do
-		# 本地网段优先用少量 ARP 请求；无响应再用一次短超时 ICMP 确认。
-		if [ -n "$interface" ] && [ "$arp_entry_count" -le 1 ]; then
-			ip_ms=$(run_with_tag arping -I "$interface" -c 2 -f -w "$probe_timeout" "$ip" 2>/dev/null)
-			echo "$ip_ms" | grep -q "ms" && break
-		fi
+		# arping 应使用 br-lan 等接口，有 WiFi 的设备接口为 wlan*，重新获取
+		[ -n "$interface" ] && local arp_entry_count=$(cat /proc/net/arp | grep '0x[26]' | grep -i -w "$mac" | wc -l 2>/dev/null)
 
-		ip_ms=$(run_with_tag ping -c 1 -W 1 "$ip" 2>/dev/null)
-		echo "$ip_ms" | grep -q "ms" && break
-		[ -n "$interface" ] && ip neigh del "$ip" dev "$interface" 2>/dev/null
-		[ "$i" -lt "$retry_count" ] && sleep 1
+		# 避免无效的 arp 条目
+		if [ -n "$arp_entry_count" ] && [ "$arp_entry_count" -le 1 ]; then
+			ip_ms=$(run_with_tag arping -I "$interface" -c 20 -f -w "$timeout" "$ip" 2>/dev/null)
+			echo "$ip_ms" | grep -q "ms" && break || ip_ms=$(run_with_tag ping -c 5 -w 3 "$ip" 2>/dev/null | grep -v '100% packet loss')
+		else
+			ip_ms=$(run_with_tag ping -c 5 -w 3 "$ip" 2>/dev/null | grep -v '100% packet loss')
+			echo "$ip_ms" | grep -q "ms" && break || ip neigh del "$ip" dev "$interface" 2>/dev/null # 清理无效条目
+		fi
+		sleep 1
 	done
 	unset i
 	echo "$ip_ms" | grep -q "ms"
 }
-
 # CPU 占用率
 getcpu() {
 	local AT=$(cat /proc/stat | grep "^cpu " | awk '{print $2+$3+$4+$5+$6+$7+$8 " " $2+$3+$4+$7+$8}')
@@ -2003,21 +1965,8 @@ getmikrotik() {
 	fi
 }
 
-# 刷新 LuCI 概览同类的无线关联设备列表，避免每个客户端重复调用 iwinfo。
-refresh_wifi_associations() {
-	local cache="${dir}/wifi_associated_macs"
-	local tmp="${dir}/wifi_associated_macs.tmp"
-	local wifi_if
-	: >"$tmp"
-	for wifi_if in $wlan_interface; do
-		iwinfo "$wifi_if" assoclist 2>/dev/null | grep -Eio '([[:xdigit:]]{2}:){5}[[:xdigit:]]{2}' >>"$tmp"
-	done
-	mv "$tmp" "$cache"
-}
-
 # 在线设备列表
 first() {
-	refresh_wifi_associations
 	[ "$qwrt_online_enable" = "1" ] && refresh_qwrt_overview_arp
 	# 注：此处为后台任务，无法操作父进程变量，故每个线程结束后都必须保存变量到文件
 	# 耗时太长，定时推送不再检查
