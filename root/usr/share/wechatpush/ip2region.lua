@@ -86,9 +86,8 @@ for field in (region .. "|"):gmatch("(.-)|") do
 end
 if #fields == 0 then fail() end
 
--- ip2region 数据源可能在国家/地区前增加大洲字段。
--- 识别到大洲时移除该字段；大陆记录若还包含县区字段，则只保留
--- 国家、省级、市级和末尾的运营商/ASN，避免输出过细的行政区划。
+-- 统一归一化为国家/地区 + 市级：不输出大洲、省份、县区、运营商或 ASN。
+-- 中国大陆省略国家名称，只保留市级；其他国家/地区保留国家/地区名称。
 local continents = {
 	["亚洲"] = true, ["asia"] = true,
 	["欧洲"] = true, ["europe"] = true,
@@ -98,19 +97,19 @@ local continents = {
 	["大洋洲"] = true, ["oceania"] = true,
 	["南极洲"] = true, ["antarctica"] = true
 }
-if continents[(fields[1] or ""):lower()] then
-	table.remove(fields, 1)
-	local country = (fields[1] or ""):lower()
-	if country == "中国香港" or country == "hong kong" or country == "hong kong sar"
-		or country == "中国澳门" or country == "macao" or country == "macau" then
-		-- 港澳记录常见格式为：国家/地区|区|市镇|运营商；只保留市镇。
-		if #fields >= 4 then
-			fields = { fields[1], fields[#fields - 1], fields[#fields] }
-		end
-	elseif #fields >= 5 then
-		-- 中国大陆记录常见格式为：国家|省|市|县区|运营商。
-		fields = { fields[1], fields[2], fields[3], fields[#fields] }
-	end
-end
+if continents[(fields[1] or ""):lower()] then table.remove(fields, 1) end
 
+local country = fields[1] or ""
+local country_lower = country:lower()
+local is_mainland_china = country == "中国" or country_lower == "china"
+	or country_lower == "cn" or country_lower == "prc" or country == "中国大陆"
+if is_mainland_china then
+	-- 中国大陆：国家|省|市|县区|运营商；旧版国家|省|市|运营商|代码格式同样适用。
+	local city = fields[3] or fields[2]
+	if city and city ~= "" then fields = { city } else fail() end
+else
+	-- 其他国家/地区：保留国家/地区及市级，丢弃其余行政层级和网络运营商信息。
+	local city = (#fields >= 4 and fields[3]) or fields[2]
+	if city and city ~= "" then fields = { country, city } else fields = { country } end
+end
 io.write(table.concat(fields, " "))
