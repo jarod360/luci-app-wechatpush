@@ -54,7 +54,7 @@ with tempfile.TemporaryDirectory() as tmp:
     assert result.returncode == 0
     assert result.stdout == "中国 宁夏回族自治区 中卫市 联通", result.stdout
 
-    # Hong Kong records: omit continent but retain district/city and ASN.
+    # Hong Kong records: omit continent and district, retain city and ASN.
     hong_kong_db = tmp / "hong-kong.xdb"
     write_xdb(
         hong_kong_db,
@@ -63,7 +63,7 @@ with tempfile.TemporaryDirectory() as tmp:
     result = lookup(hong_kong_db)
     assert result.returncode == 0
     assert result.stdout == (
-        "中国香港 Kwai Tsing District 葵涌 DMIT Cloud Services AS906"
+        "中国香港 葵涌 DMIT Cloud Services AS906"
     ), result.stdout
 
     missing = lookup(legacy_db, "1.2.3.5")
