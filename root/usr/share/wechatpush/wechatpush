@@ -402,7 +402,7 @@ main() {
 		[ ! -f "${dir}/send_enable.lock" ] && down_send
 
 		# 当前设备列表
-		[ -n "$content" ] && [ "$offline_push_pending" != "1" ] && [ ! -f "${dir}/send_enable.lock" ] && current_device
+		[ -n "$content" ] && [ ! -s "${dir}/device_events" ] && [ ! -f "${dir}/send_enable.lock" ] && current_device
 
 		if [ "$run_regular_tasks" -eq 1 ]; then
 		# 无人值守任务
@@ -497,10 +497,22 @@ main() {
 		done <<<"$tmp_ip_list"
 		fi
 
+		# 同一轮 first() 已等待全部设备检测任务结束；把本轮所有连接/断开事件合并成一条推送。
+		if [ -s "${dir}/device_events" ]; then
+			device_event_count=$(grep -c . "${dir}/device_events" 2>/dev/null)
+			device_event_count=${device_event_count:-0}
+			if [ "$device_event_count" -eq 1 ]; then
+				title=$(sed -n '1p' "${dir}/device_events")
+			elif [ "$device_event_count" -gt 1 ]; then
+				title="$(translate "Device status changed")（${device_event_count}）"
+			fi
+		fi
+
 		# 推送
 		if [ ! -f "${dir}/send_enable.lock" ] && [ -n "$title" ] && [ -n "$content" ]; then
 			[ -n "$device_name" ] && title="【$device_name】$title"
-			(echo "$lite_enable" | grep -q "content") && content="$title"
+			# "仅推送标题"保留用于定时/系统通知；设备事件批次必须保留逐台状态正文。
+			[ ! -s "${dir}/device_events" ] && (echo "$lite_enable" | grep -q "content") && content="$title"
 			disturb
 			disturb_RETVAL=$?
 			if [ "$disturb_RETVAL" -eq 0 ]; then
@@ -860,7 +872,7 @@ run_with_tag() {
 # 清理临时文件
 deltemp() {
 	unset title content gateway_iplist
-	rm -f "${dir}/title" "${dir}/content" "${dir}/send_enable.lock" "${tempjsonpath}" "${dir}/cookies.txt" >/dev/null 2>&1
+	rm -f "${dir}/title" "${dir}/content" "${dir}/device_events" "${dir}/send_enable.lock" "${tempjsonpath}" "${dir}/cookies.txt" >/dev/null 2>&1
 	[ -f "$logfile" ] && local logrow=$(grep -c "" "$logfile") || local logrow="0"
 	[ "$logrow" -gt 500 ] && tail -n 300 "$logfile" >"${logfile}.tmp" && mv "${logfile}.tmp" "$logfile" && log_change "[DEBUG] $(translate "Log exceeded limit, keeping last 300 entries")"
 }
@@ -2164,18 +2176,11 @@ up() {
 			[ -f "${dir}/send_enable.lock" ] || [ -z "$notification_online" ] || [ -z "$ip_blackwhite" ] && silent_run LockFile unlock && return
 			[ -z "$ip_blackwhite" ] || [ "$ip_blackwhite" -ne "0" ] && silent_run LockFile unlock && return
 
-			[ -f "${dir}/title" ] && local title=$(cat "${dir}/title")
 			[ -f "${dir}/content" ] && local content=$(cat "${dir}/content")
 
-			if [ -z "$title" ]; then
-				local title=$(translate "%s connected to your router" "$name")
-				local content_title="${str_title_start}$(translate "New device connected")${str_title_end}"
-			elif echo "$title" | grep -q "$(translate "connected to your router")"; then
-				local title="${name} ${title}"
-			else
-				local title="$(translate "Device status changed")"
-				local content_title="${str_title_start}$(translate "New device connected")${str_title_end}"
-			fi
+			# 所有在线/离线事件使用同一批次标题，具体设备状态逐台写入正文。
+			local title="$(translate "Device status changed")"
+			local content_title="${str_title_start}$(translate "New device connected")${str_title_end}"
 
 			local up_dbm=$(get_signal_dbm "$mac")
 			local label_name="$(translate "Client Name:")"
@@ -2189,14 +2194,15 @@ up() {
 
 			local detail_fields=("$label_name" "$name" "$label_ip" "$ip" "$label_mac" "$mac" "$label_interface" "$interface")
 			[ -n "$up_dbm" ] && detail_fields+=("$label_signal" "$up_dbm dBm")
-			content="${str_splitline}${content_title}$(format_detail_block "$detail_width" "${detail_fields[@]}")"
+			local up_event=$(translate "New device %s %s connected" "$name" "$ip")
+			content="${str_splitline}${content_title}${str_linefeed}${str_tab} - ${up_event}$(format_detail_block "$detail_width" "${detail_fields[@]}")"
 
-			local up_log=$(translate "New device %s %s connected" "$name" "$ip")
-			[ -n "$up_dbm" ] && up_log="${up_log} dbm:${up_dbm}"
-			log_change "${disturb_text} ${up_log}"
+			[ -n "$up_dbm" ] && up_event="${up_event} dbm:${up_dbm}"
+			log_change "${disturb_text} ${up_event}"
 
 			[ -n "$title" ] && echo "$title" >"${dir}/title"
 			[ -n "$content" ] && echo -n "$content" >>"${dir}/content"
+			printf '%s\\n' "$up_event" >>"${dir}/device_events"
 		fi
 		silent_run LockFile unlock
 	fi
@@ -2398,14 +2404,16 @@ current_device() {
 
 	if [ "$is_mpnews" -eq 1 ]; then
 		# 图文版使用真实 HTML 表格，避免依赖空格宽度模拟列对齐。
-		local table_html="<table border='0' cellpadding='3' cellspacing='0'><tr><th align='left'>${name_header}</th><th align='left'>${ip_header}</th><th align='left'>${time_header}</th>"
-		[ "$has_usage" -eq 2 ] && table_html="${table_html}<th align='left'>${traffic_header}</th>"
+		local table_html="<table border='0' cellpadding='3' cellspacing='0'><tr><th align='left'>${name_header}&nbsp;&nbsp;</th><th align='left'>${ip_header}&nbsp;&nbsp;</th><th align='left'>${time_header}"
+		[ "$has_usage" -eq 2 ] && table_html="${table_html}&nbsp;&nbsp;</th><th align='left'>${traffic_header}</th>" || table_html="${table_html}</th>"
 		table_html="${table_html}</tr>"
 		for i in "${!ips[@]}"; do
-			local line="<tr><td>${names[i]}</td><td>${ips[i]}</td><td>${time_onlines[i]}</td>"
-			[ "$has_usage" -eq 2 ] && line="${line}<td>${traffic_values[i]}</td>"
-			table_html="${table_html}${line}</tr>"
-		done
+			local line="<tr><td>${names[i]}&nbsp;&nbsp;</td><td>${ips[i]}&nbsp;&nbsp;</td><td>${time_onlines[i]}"
+			if [ "$has_usage" -eq 2 ]; then
+				line="${line}&nbsp;&nbsp;</td><td>${traffic_values[i]}</td>"
+			else
+				line="${line}</td>"
+			fi
 		table_html="${table_html}</table>"
 		content="${content}${explain}${str_linefeed}${table_html}${str_linefeed}"
 	else
@@ -3438,16 +3446,17 @@ down_send() {
 		detail_fields+=("$label_uptime" "$time1")
 		[ -n "$down_dbm" ] && detail_fields+=("$label_signal" "$down_dbm dBm")
 
-		content="${content}${str_splitline}${content_title}$(format_detail_block "$detail_width" "${detail_fields[@]}")"
+		local down_event=$(translate "Device %s %s disconnected" "$name" "$ip")
+		content="${content}${str_splitline}${str_linefeed}${str_tab} - ${down_event}$(format_detail_block "$detail_width" "${detail_fields[@]}")"
 
 		# 发送失败时保留离线状态供下一轮重试；日志只记一次，避免 5 秒轮询时刷屏。
 		local log_marker="${dir}/offline_logged_$(printf '%s' "$ip" | tr -c 'A-Za-z0-9_-' '_')"
 		if [ ! -f "$log_marker" ]; then
-			local down_log=$(translate "Device %s %s disconnected" "$name" "$ip")
-			[ -n "$down_dbm" ] && down_log="${down_log} dbm:${down_dbm}"
-			log_change "${disturb_text} ${down_log}"
+			[ -n "$down_dbm" ] && down_event="${down_event} dbm:${down_dbm}"
+			log_change "${disturb_text} ${down_event}"
 			touch "$log_marker"
 		fi
+		printf '%s\\n' "$down_event" >>"${dir}/device_events"
 		offline_push_pending=1
 	done
 
