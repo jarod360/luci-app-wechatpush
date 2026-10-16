@@ -2104,8 +2104,10 @@ current_device() {
 		mac=$(getmac "$ip")
 		name=$(getname "$ip" "$mac")
 		if [ "$is_mpnews" -eq 1 ]; then
-			# 图文版客户端名最多占 14 个显示列（7 个汉字）；截断时为省略号预留宽度。
-			name=$(cut_str "$name" "12")
+			# 图文版客户端名最多占 14 个显示列（7 个汉字）；仅超宽时才为省略号预留宽度。
+			local name_width
+			name_width=$(length_str "$name")
+			[ "$name_width" -gt 14 ] && name=$(cut_str "$name" "12")
 		else
 			name=$(cut_str "$name" "16")
 		fi
