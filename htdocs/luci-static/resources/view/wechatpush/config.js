@@ -394,7 +394,7 @@ return view.extend({
 
 		o = s.taboption('basic', form.Flag, 'qwrt_online_enable', _('QWRT native online detection'));
 		o.default = '0';
-		o.description = '仅适用于 QWRT 2026.10.6 及以上版本。开启后完全按 QWRT 概览的 ARP/MAC 规则判断在线状态，不再使用 ping/arping 主动探测。该选项独立于 QWRT 原生流量统计；关闭时保持原有在线检测逻辑。';
+		o.description = '仅适用于 QWRT 2026.10.6 及以上版本。开启后按 QWRT 概览相同的 ARP/MAC 规则检测，每 5 秒刷新一次设备状态；离线本轮直接触发推送，不等待第二轮确认。不使用 ping/arping 主动探测。该选项独立于流量统计；关闭时保持原有检测逻辑。';
 
 		o = s.taboption('basic', form.Flag, 'prefer_client_page', _('Prefer displaying online devices'));
 		o.default = '1';

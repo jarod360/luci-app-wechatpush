@@ -359,21 +359,41 @@ main() {
 	>"${dir}/send_enable.lock" && first && deltemp
 	log_change "[INFO] $(translate "Initialization completed")"
 
+	# QWRT 原生在线检测单独按 5 秒轮询；sleeptime 仍控制网络检查、流量告警等常规任务。
+	local last_regular_run=0
+	local qwrt_scan_interval=5
+	[[ "$sleeptime" =~ ^[0-9]+$ ]] && [ "$sleeptime" -gt 0 ] && [ "$sleeptime" -lt "$qwrt_scan_interval" ] && qwrt_scan_interval="$sleeptime"
+
 	# 循环
 	while [ "$enable" -eq "1" ]; do
 		deltemp
+		loop_now=$(date +%s)
+		run_regular_tasks=1
+		if [ "$qwrt_online_enable" = "1" ]; then
+			if [ "$last_regular_run" -gt 0 ] && [ "$((loop_now - last_regular_run))" -lt "$sleeptime" ]; then
+				run_regular_tasks=0
+			else
+				last_regular_run=$loop_now
+			fi
+		fi
 
-		# 网络状态与 IP 变动
-		if [ "$get_ipv4_mode" -ne "0" ] || [ "$get_ipv6_mode" -ne "0" ]; then
-			check_connect
-			ip_changes
+		# 网络状态与 IP 变动仍按原配置周期执行。
+		if [ "$run_regular_tasks" -eq 1 ]; then
+			if [ "$get_ipv4_mode" -ne "0" ] || [ "$get_ipv6_mode" -ne "0" ]; then
+				check_connect
+				ip_changes
+			fi
 		fi
 
 		# 设备列表
 		if [ ! -f "${dir}/send_enable.lock" ]; then
 			[ -n "$title" ] && echo "$title" >"${dir}/title"
 			[ -n "$content" ] && echo "$content" >"${dir}/content"
-			first
+			if [ "$qwrt_online_enable" = "1" ] && [ "$run_regular_tasks" -eq 0 ]; then
+				first qwrt-fast
+			else
+				first
+			fi
 			[ -f "${dir}/title" ] && title=$(cat "${dir}/title") && rm -f "${dir}/title" >/dev/null 2>&1
 			[ -f "${dir}/content" ] && content=$(cat "${dir}/content") && rm -f "${dir}/content" >/dev/null 2>&1
 		fi
@@ -384,6 +404,7 @@ main() {
 		# 当前设备列表
 		[ -n "$content" ] && [ ! -f "${dir}/send_enable.lock" ] && current_device
 
+		if [ "$run_regular_tasks" -eq 1 ]; then
 		# 无人值守任务
 		[ ! -f "${dir}/send_enable.lock" ] && unattended
 
@@ -474,6 +495,7 @@ main() {
 		while IFS= read -r tmp_ip; do
 			[ -n "$tmp_ip" ] && add_ip_white "$tmp_ip" "0"
 		done <<<"$tmp_ip_list"
+		fi
 
 		# 推送
 		if [ ! -f "${dir}/send_enable.lock" ] && [ -n "$title" ] && [ -n "$content" ]; then
@@ -484,7 +506,11 @@ main() {
 			[ "$disturb_RETVAL" -eq 0 ] && diy_send "${title}" "${content}" "${jsonpath}" >/dev/null 2>&1
 		fi
 
-		sleep $sleeptime
+		if [ "$qwrt_online_enable" = "1" ]; then
+			sleep "$qwrt_scan_interval"
+		else
+			sleep "$sleeptime"
+		fi
 
 		# 等待定时任务推送完成
 		while [ -f "${dir}/send_pid" ]; do
@@ -863,6 +889,12 @@ getmac() {
 	local uptime=$(jq -r --arg ip "$ip" '.devices[] | select(.ip == $ip and .status == "online") | .uptime' "$devices_json")
 	[ -n "$uptime" ] && local time_up=$(expr $(date +%s) - $uptime) && [ "$time_up" -lt 600 ] && mac=$(nmblookup_timeout "${ip}" "mac" "5" 2>/dev/null)
 	process_and_check "$mac" && return
+
+	# QWRT 原生检测：ARP 项消失后仍保留已记录 MAC，用于准确判断离线并应用 MAC 黑白名单。
+	if [ "$qwrt_online_enable" = "1" ] && [ -f "$devices_json" ]; then
+		local saved_mac=$(jq -r --arg ip "$ip" '.devices[] | select(.ip == $ip) | .mac // empty' "$devices_json" 2>/dev/null | head -n1)
+		process_and_check "$saved_mac" && return
+	fi
 
 	# 默认返回 unknown
 	echo "unknown"
@@ -1971,11 +2003,13 @@ first() {
 	# 注：此处为后台任务，无法操作父进程变量，故每个线程结束后都必须保存变量到文件
 	# 耗时太长，定时推送不再检查
 	local IPLIST=$(jq -r '.devices[] | select(.status == "online" or .status == "unknown") | .ip' "$devices_json" | sort -u)
-	[ ! -f "${dir}/send_pid" ] && getgateway
-	[ ! -f "${dir}/send_pid" ] && getmiwifi
-	[ ! -f "${dir}/send_pid" ] && getopenwrt
-	[ ! -f "${dir}/send_pid" ] && getmikrotik
-	[ ! -f "${dir}/send_pid" ] && silent_run scanlocalip
+	if [ "$1" != "qwrt-fast" ]; then
+		[ ! -f "${dir}/send_pid" ] && getgateway
+		[ ! -f "${dir}/send_pid" ] && getmiwifi
+		[ ! -f "${dir}/send_pid" ] && getopenwrt
+		[ ! -f "${dir}/send_pid" ] && getmikrotik
+		[ ! -f "${dir}/send_pid" ] && silent_run scanlocalip
+	fi
 	for ip in $IPLIST; do
 		[ -n "$passive_mode" ] && [ "$passive_mode" -eq "1" ] && break
 		# 获取一个令牌
@@ -2110,11 +2144,12 @@ down() {
 
 	# 离线，置入待验证区
 	if [ "$ping_online" -eq "1" ]; then
-		# 修改为 unknown
-		if jq -e --arg ip "$ip" '.devices[] | select(.ip == $ip and .status == "online") | .ip' "$devices_json" >/dev/null; then
+		if [ "$qwrt_online_enable" = "1" ]; then
+			# QWRT 原生模式已按概览相同的 ARP/MAC 规则判定，本轮直接转为 offline。
+			jq --arg ip "$ip" '.devices |= map(if .ip == $ip then .status = "offline" else . end)' "$devices_json" >"$tmp_devices_json" && mv "$tmp_devices_json" "$devices_json"
+		# 关闭 QWRT 原生检测时，完整保留原有 unknown -> offline 二次确认流程。
+		elif jq -e --arg ip "$ip" '.devices[] | select(.ip == $ip and .status == "online") | .ip' "$devices_json" >/dev/null; then
 			jq --arg ip "$ip" '.devices |= map(if .ip == $ip then .status = "unknown" else . end)' "$devices_json" >"$tmp_devices_json" && mv "$tmp_devices_json" "$devices_json"
-		#这里其实无需再判断，只有 status == "online" 和 status == "unknown" 的设备会使用 down $ip
-		#elif jq -e --arg ip "$ip" '.devices[] | select(.ip == $ip and .status == "unknown") | .ip' "$devices_json" >/dev/null; then
 		else
 			jq --arg ip "$ip" '.devices |= map(if .ip == $ip then .status = "offline" else . end)' "$devices_json" >"$tmp_devices_json" && mv "$tmp_devices_json" "$devices_json"
 		fi
