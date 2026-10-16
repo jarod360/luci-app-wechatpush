@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-wechatpush
-PKG_VERSION:=3.6.52
+PKG_VERSION:=3.6.53
 PKG_RELEASE:=1
 
 PKG_MAINTAINER:=tty228 <tty228@yeah.net>
@@ -11,7 +11,7 @@ PKG_CONFIG_DEPENDS:= \
 
 LUCI_TITLE:=LuCI support for wechatpush
 LUCI_PKGARCH:=all
-LUCI_DEPENDS:=+iputils-arping +curl +jq +bash +luci-lua-runtime \
+LUCI_DEPENDS:=+iputils-arping +curl +jq +bash +lua +luci-lua-runtime \
         +PACKAGE_$(PKG_NAME)_Enable_Local_Disk_Information_Detection:lsblk \
         +PACKAGE_$(PKG_NAME)_Enable_Local_Disk_Information_Detection:smartmontools \
         +PACKAGE_$(PKG_NAME)_Enable_Local_Disk_Information_Detection:smartmontools-drivedb \
