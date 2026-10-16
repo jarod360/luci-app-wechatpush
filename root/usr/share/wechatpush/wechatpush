@@ -2452,19 +2452,32 @@ current_device() {
 		content="${content}${explain}${str_linefeed}${table_html}${str_linefeed}"
 	else
 		local list_header="${str_linefeed}${str_tab}"
-		list_header+=$(pad_field "$name_header" "$name_max")
-		list_header+=$(pad_field "$ip_header" "$ip_max")
-		list_header+=$(pad_field "$time_header" "$time_max")
-		[ "$has_usage" -eq 2 ] && list_header+=$(pad_field "$traffic_header" "$traffic_max")
-		content="${content}${explain}${list_header}"
-		for i in "${!ips[@]}"; do
-			local line="${str_linefeed}${str_tab}"
-			line+=$(pad_field "${names[i]}" "$name_max")
-			line+=$(pad_field "${ips[i]}" "$ip_max")
-			line+=$(pad_field "${time_onlines[i]}" "$time_max")
-			[ "$has_usage" -eq 2 ] && line+=$(pad_field "${traffic_values[i]}" "$traffic_max")
-			content="${content}${line}"
-		done
+		if [ "$is_text" -eq 1 ]; then
+			# 企业微信文字版不做列宽对齐，每列之间只保留一个全角空格，末列不追加空格。
+			list_header+="${name_header}　${ip_header}　${time_header}"
+			[ "$has_usage" -eq 2 ] && list_header+="　${traffic_header}"
+			content="${content}${explain}${list_header}"
+			for i in "${!ips[@]}"; do
+				local line="${str_linefeed}${str_tab}${names[i]}　${ips[i]}　${time_onlines[i]}"
+				[ "$has_usage" -eq 2 ] && line+="　${traffic_values[i]}"
+				content="${content}${line}"
+			done
+		else
+			# 其他非图文模板继续使用原有动态列宽对齐方式。
+			list_header+=$(pad_field "$name_header" "$name_max")
+			list_header+=$(pad_field "$ip_header" "$ip_max")
+			list_header+=$(pad_field "$time_header" "$time_max")
+			[ "$has_usage" -eq 2 ] && list_header+=$(pad_field "$traffic_header" "$traffic_max")
+			content="${content}${explain}${list_header}"
+			for i in "${!ips[@]}"; do
+				local line="${str_linefeed}${str_tab}"
+				line+=$(pad_field "${names[i]}" "$name_max")
+				line+=$(pad_field "${ips[i]}" "$ip_max")
+				line+=$(pad_field "${time_onlines[i]}" "$time_max")
+				[ "$has_usage" -eq 2 ] && line+=$(pad_field "${traffic_values[i]}" "$traffic_max")
+				content="${content}${line}"
+			done
+		fi
 	fi
 	[ -f "${dir}/send_pid" ] && echo "$content" >"$output_dir/current_device" && unset content
 }
