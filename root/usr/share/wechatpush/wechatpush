@@ -402,7 +402,7 @@ main() {
 		[ ! -f "${dir}/send_enable.lock" ] && down_send
 
 		# 当前设备列表
-		[ -n "$content" ] && [ ! -f "${dir}/send_enable.lock" ] && current_device
+		[ -n "$content" ] && [ "$offline_push_pending" != "1" ] && [ ! -f "${dir}/send_enable.lock" ] && current_device
 
 		if [ "$run_regular_tasks" -eq 1 ]; then
 		# 无人值守任务
@@ -503,7 +503,21 @@ main() {
 			(echo "$lite_enable" | grep -q "content") && content="$title"
 			disturb
 			disturb_RETVAL=$?
-			[ "$disturb_RETVAL" -eq 0 ] && diy_send "${title}" "${content}" "${jsonpath}" >/dev/null 2>&1
+			if [ "$disturb_RETVAL" -eq 0 ]; then
+				diy_send "${title}" "${content}" "${jsonpath}" >/dev/null 2>&1
+				push_result=$?
+				if [ "$push_result" -eq 0 ]; then
+					[ "$offline_push_pending" = "1" ] && clear_offline_devices
+				elif [ "$offline_push_pending" = "1" ]; then
+					if [ ! -f "${dir}/offline_push_failed" ]; then
+						log_change "[WARN] 离线通知发送失败，保留离线记录，下一轮重试"
+						touch "${dir}/offline_push_failed"
+					fi
+				fi
+			else
+				# 免打扰仍按原行为抑制通知，不在免打扰结束后补发。
+				[ "$offline_push_pending" = "1" ] && clear_offline_devices
+			fi
 		fi
 
 		if [ "$qwrt_online_enable" = "1" ]; then
@@ -723,10 +737,31 @@ max_display_width() {
 	printf '%s\n' "$max_width"
 }
 
-# 输出一条动态对齐的设备详情行。
+# 输出一条按模板对齐的设备详情行。
 format_detail_line() {
 	local label="$1" value="$2" target_width="$3"
 	printf '%s%s - %s%s' "$str_linefeed" "$str_tab" "$(pad_field "$label" "$target_width")" "$value"
+}
+
+# 图文消息使用真实 HTML 表格统一列宽；纯文字/Markdown 继续使用空格排版。
+format_detail_block() {
+	local target_width="$1"
+	shift
+
+	if [[ "$jsonpath" == *"/qywx_mpnews.json" ]]; then
+		local html="${str_linefeed}<table border='0' cellpadding='2' cellspacing='0'>"
+		while [ "$#" -ge 2 ]; do
+			local label="$1" value="$2"
+			html="${html}<tr><td valign='top' nowrap='nowrap'>${label}</td><td valign='top'>${value}</td></tr>"
+			shift 2
+		done
+		printf '%s</table>' "$html"
+	else
+		while [ "$#" -ge 2 ]; do
+			printf '%s' "$(format_detail_line "$1" "$2" "$target_width")"
+			shift 2
+		done
+	fi
 }
 
 # 翻译
@@ -2152,8 +2187,9 @@ up() {
 			detail_width=$(max_display_width "$label_name" "$label_ip" "$label_mac" "$label_interface" "$label_signal")
 			detail_width=$((detail_width + 2))
 
-			content="${str_splitline}${content_title}$(format_detail_line "$label_name" "$name" "$detail_width")$(format_detail_line "$label_ip" "$ip" "$detail_width")$(format_detail_line "$label_mac" "$mac" "$detail_width")$(format_detail_line "$label_interface" "$interface" "$detail_width")"
-			[ -n "$up_dbm" ] && content="${content}$(format_detail_line "$label_signal" "$up_dbm dBm" "$detail_width")"
+			local detail_fields=("$label_name" "$name" "$label_ip" "$ip" "$label_mac" "$mac" "$label_interface" "$interface")
+			[ -n "$up_dbm" ] && detail_fields+=("$label_signal" "$up_dbm dBm")
+			content="${str_splitline}${content_title}$(format_detail_block "$detail_width" "${detail_fields[@]}")"
 
 			local up_log=$(translate "New device %s %s connected" "$name" "$ip")
 			[ -n "$up_dbm" ] && up_log="${up_log} dbm:${up_dbm}"
@@ -2360,20 +2396,34 @@ current_device() {
 	time_max=$((time_max + 2))
 	[ "$has_usage" -eq 2 ] && traffic_max=$((traffic_max + 2))
 
-	local list_header="${str_linefeed}${str_tab}"
-	list_header+=$(pad_field "$name_header" "$name_max")
-	list_header+=$(pad_field "$ip_header" "$ip_max")
-	list_header+=$(pad_field "$time_header" "$time_max")
-	[ "$has_usage" -eq 2 ] && list_header+=$(pad_field "$traffic_header" "$traffic_max")
-	content="${content}${explain}${list_header}"
-	for i in "${!ips[@]}"; do
-		local line="${str_linefeed}${str_tab}"
-		line+=$(pad_field "${names[i]}" "$name_max")
-		line+=$(pad_field "${ips[i]}" "$ip_max")
-		line+=$(pad_field "${time_onlines[i]}" "$time_max")
-		[ "$has_usage" -eq 2 ] && line+=$(pad_field "${traffic_values[i]}" "$traffic_max")
-		content="${content}${line}"
-	done
+	if [ "$is_mpnews" -eq 1 ]; then
+		# 图文版使用真实 HTML 表格，避免依赖空格宽度模拟列对齐。
+		local table_html="<table border='0' cellpadding='3' cellspacing='0'><tr><th align='left'>${name_header}</th><th align='left'>${ip_header}</th><th align='left'>${time_header}</th>"
+		[ "$has_usage" -eq 2 ] && table_html="${table_html}<th align='left'>${traffic_header}</th>"
+		table_html="${table_html}</tr>"
+		for i in "${!ips[@]}"; do
+			local line="<tr><td>${names[i]}</td><td>${ips[i]}</td><td>${time_onlines[i]}</td>"
+			[ "$has_usage" -eq 2 ] && line="${line}<td>${traffic_values[i]}</td>"
+			table_html="${table_html}${line}</tr>"
+		done
+		table_html="${table_html}</table>"
+		content="${content}${explain}${str_linefeed}${table_html}${str_linefeed}"
+	else
+		local list_header="${str_linefeed}${str_tab}"
+		list_header+=$(pad_field "$name_header" "$name_max")
+		list_header+=$(pad_field "$ip_header" "$ip_max")
+		list_header+=$(pad_field "$time_header" "$time_max")
+		[ "$has_usage" -eq 2 ] && list_header+=$(pad_field "$traffic_header" "$traffic_max")
+		content="${content}${explain}${list_header}"
+		for i in "${!ips[@]}"; do
+			local line="${str_linefeed}${str_tab}"
+			line+=$(pad_field "${names[i]}" "$name_max")
+			line+=$(pad_field "${ips[i]}" "$ip_max")
+			line+=$(pad_field "${time_onlines[i]}" "$time_max")
+			[ "$has_usage" -eq 2 ] && line+=$(pad_field "${traffic_values[i]}" "$traffic_max")
+			content="${content}${line}"
+		done
+	fi
 	[ -f "${dir}/send_pid" ] && echo "$content" >"$output_dir/current_device" && unset content
 }
 # 无人值守任务
@@ -3335,18 +3385,22 @@ ${str_space}${log_type_short} ${login_mode}"
 
 # 设备离线通知
 down_send() {
+	offline_push_pending=0
 	# 如果没有离线设备，退出
-	[ "$(jq '.devices | map(select(.status == "offline")) | length' "$devices_json")" -eq 0 ] && return
-
 	local IPLIST=$(jq -r '.devices[] | select(.status == "offline") | .ip' "$devices_json" | sort -u)
+	[ -z "$IPLIST" ] && return
+
 	for ip in $IPLIST; do
 		local mac=$(getmac "$ip")
 		blackwhitelist "$mac"
 		local ip_blackwhite=$?
-		[ -z "$notification_offline" ] || [ -z "$ip_blackwhite" ] && continue
-		[ -z "$ip_blackwhite" ] || [ "$ip_blackwhite" -ne "0" ] && continue
+		[ -z "$notification_offline" ] && continue
+		[ "$ip_blackwhite" -ne "0" ] && continue
 
 		local name=$(getname "$ip" "$mac")
+		# 主循环依赖 title 和 content 同时非空才会发送；离线事件必须设置标题。
+		[ -n "$title" ] || title="$(translate "Device status changed")"
+		local content_title="${str_title_start}$(translate "Device status changed")${str_title_end}"
 		local label_name="$(translate "Client Name:")"
 		local label_ip="$(translate "Client IP:")"
 		local label_mac="$(translate "Client MAC:")"
@@ -3360,7 +3414,8 @@ down_send() {
 		detail_width=$((detail_width + 2))
 
 		local time_up=$(jq -r --arg ip "$ip" '.devices[] | select(.ip == $ip and .status == "offline") | .uptime' "$devices_json")
-		local ip_total="" raw_traffic upload_bytes download_bytes total_bytes
+		local detail_fields=("$label_name" "$name" "$label_ip" "$ip" "$label_mac" "$mac")
+		local raw_traffic upload_bytes download_bytes total_bytes
 		if [ "$qwrt_traffic_enable" = "1" ]; then
 			raw_traffic=$(qwrt_traffic_for_ip "$ip" raw) || raw_traffic=""
 			if [ -n "$raw_traffic" ]; then
@@ -3368,28 +3423,43 @@ down_send() {
 				[[ "$upload_bytes" =~ ^[0-9]+$ ]] || upload_bytes=0
 				[[ "$download_bytes" =~ ^[0-9]+$ ]] || download_bytes=0
 				if [[ "$jsonpath" == *"/qywx_markdown.json" ]]; then
-					ip_total="$(format_detail_line "$label_download" "$(format_traffic_bytes "$download_bytes")" "$detail_width")"
+					detail_fields+=("$label_download" "$(format_traffic_bytes "$download_bytes")")
 				elif [[ "$jsonpath" == *"/qywx_mpnews.json" ]]; then
-					ip_total="$(format_detail_line "$label_upload" "$(format_traffic_bytes "$upload_bytes")" "$detail_width")$(format_detail_line "$label_download" "$(format_traffic_bytes "$download_bytes")" "$detail_width")"
+					detail_fields+=("$label_upload" "$(format_traffic_bytes "$upload_bytes")" "$label_download" "$(format_traffic_bytes "$download_bytes")")
 				else
 					total_bytes=$((upload_bytes + download_bytes))
-					ip_total="$(format_detail_line "$label_upload" "$(format_traffic_bytes "$upload_bytes")" "$detail_width")$(format_detail_line "$label_download" "$(format_traffic_bytes "$download_bytes")" "$detail_width")$(format_detail_line "$label_total" "$(format_traffic_bytes "$total_bytes")" "$detail_width")"
+					detail_fields+=("$label_upload" "$(format_traffic_bytes "$upload_bytes")" "$label_download" "$(format_traffic_bytes "$download_bytes")" "$label_total" "$(format_traffic_bytes "$total_bytes")")
 				fi
 			fi
 		fi
 		local time1=$(date +%s)
 		local time1=$(time_for_humans $(expr ${time1} - ${time_up}))
 		local down_dbm=$(get_signal_dbm "$mac")
+		detail_fields+=("$label_uptime" "$time1")
+		[ -n "$down_dbm" ] && detail_fields+=("$label_signal" "$down_dbm dBm")
 
-		content="${content}${content_title}$(format_detail_line "$label_name" "$name" "$detail_width")$(format_detail_line "$label_ip" "$ip" "$detail_width")$(format_detail_line "$label_mac" "$mac" "$detail_width")${ip_total}$(format_detail_line "$label_uptime" "$time1" "$detail_width")"
-		[ -n "$down_dbm" ] && content="${content}$(format_detail_line "$label_signal" "$down_dbm dBm" "$detail_width")"
-		local down_log=$(translate "Device %s %s disconnected" "$name" "$ip")
-		[ -n "$down_dbm" ] && down_log="${down_log} dbm:${down_dbm}"
-		log_change "${disturb_text} ${down_log}"
-		
+		content="${content}${str_splitline}${content_title}$(format_detail_block "$detail_width" "${detail_fields[@]}")"
+
+		# 发送失败时保留离线状态供下一轮重试；日志只记一次，避免 5 秒轮询时刷屏。
+		local log_marker="${dir}/offline_logged_$(printf '%s' "$ip" | tr -c 'A-Za-z0-9_-' '_')"
+		if [ ! -f "$log_marker" ]; then
+			local down_log=$(translate "Device %s %s disconnected" "$name" "$ip")
+			[ -n "$down_dbm" ] && down_log="${down_log} dbm:${down_dbm}"
+			log_change "${disturb_text} ${down_log}"
+			touch "$log_marker"
+		fi
+		offline_push_pending=1
 	done
+
+	# 若全部离线设备都被关闭通知/黑白名单过滤，按原逻辑清除；待发送事件则留到发送成功后清理。
+	[ "$offline_push_pending" = "1" ] || clear_offline_devices
+}
+
+# 清理已处理的离线设备；成功发送后调用，失败则保留以便重试。
+clear_offline_devices() {
 	silent_run LockFile lock
 	jq 'del(.devices[] | select(.status == "offline"))' "$devices_json" >"$tmp_devices_json" && mv "$tmp_devices_json" "$devices_json"
+	rm -f "${dir}"/offline_logged_* "${dir}/offline_push_failed"
 	silent_run LockFile unlock
 }
 
