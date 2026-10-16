@@ -504,7 +504,14 @@ main() {
 			if [ "$device_event_count" -eq 1 ]; then
 				title=$(sed -n '1p' "${dir}/device_events")
 			elif [ "$device_event_count" -gt 1 ]; then
-				title="$(translate "Device status changed")（${device_event_count}台）"
+				local first_event=$(sed -n '1p' "${dir}/device_events")
+				if [ "$(grep -c ' 断开连接 [0-9][0-9][0-9][0-9]-' "${dir}/device_events")" -eq "$device_event_count" ]; then
+					local first_name="${first_event% 断开连接 *}"
+					local event_time="${first_event##* 断开连接 }"
+					title="${first_name} 等${device_event_count}台断开连接 ${event_time}"
+				else
+					title="客户端状态变化（${device_event_count}台）"
+				fi
 			fi
 		fi
 
@@ -3399,6 +3406,7 @@ down_send() {
 	local IPLIST=$(jq -r '.devices[] | select(.status == "offline") | .ip' "$devices_json" | sort -u)
 	[ -z "$IPLIST" ] && return
 
+	local offline_heading_added=0
 	for ip in $IPLIST; do
 		local mac=$(getmac "$ip")
 		blackwhitelist "$mac"
@@ -3407,8 +3415,6 @@ down_send() {
 		[ "$ip_blackwhite" -ne "0" ] && continue
 
 		local name=$(getname "$ip" "$mac")
-		# 主循环依赖 title 和 content 同时非空才会发送；离线事件必须设置标题。
-		[ -n "$title" ] || title="$(translate "Device status changed")"
 		local label_name="$(translate "Client Name:")"
 		local label_ip="$(translate "Client IP:")"
 		local label_mac="$(translate "Client MAC:")"
@@ -3446,8 +3452,16 @@ down_send() {
 		detail_fields+=("$label_uptime" "$time1")
 		[ -n "$down_dbm" ] && detail_fields+=("$label_signal" "$down_dbm dBm")
 
+		# 正文统一使用设备连接通知的详情排版；状态标题独立显示，不重复写入设备名/IP。
+		if [ "$offline_heading_added" -eq 0 ]; then
+			content="${content}${str_splitline}${str_title_start}设备断开连接${str_title_end}"
+			offline_heading_added=1
+		fi
+		content="${content}$(format_detail_block "$detail_width" "${detail_fields[@]}")"
+
+		local event_time=$(date "+%Y-%m-%d %H:%M:%S")
+		local down_title="${name} 断开连接 ${event_time}"
 		local down_event=$(translate "Device %s %s disconnected" "$name" "$ip")
-		content="${content}${str_splitline}${str_linefeed}${str_tab} - ${down_event}$(format_detail_block "$detail_width" "${detail_fields[@]}")"
 
 		# 发送失败时保留离线状态供下一轮重试；日志只记一次，避免 5 秒轮询时刷屏。
 		local log_marker="${dir}/offline_logged_$(printf '%s' "$ip" | tr -c 'A-Za-z0-9_-' '_')"
@@ -3456,9 +3470,12 @@ down_send() {
 			log_change "${disturb_text} ${down_event}"
 			touch "$log_marker"
 		fi
-		printf '%s\n' "$down_event" >>"${dir}/device_events"
+		printf '%s\n' "$down_title" >>"${dir}/device_events"
 		offline_push_pending=1
 	done
+
+	# 离线详情后附加当前在线设备数量及列表。
+	[ "$offline_push_pending" = "1" ] && current_device
 
 	# 若全部离线设备都被关闭通知/黑白名单过滤，按原逻辑清除；待发送事件则留到发送成功后清理。
 	[ "$offline_push_pending" = "1" ] || clear_offline_devices
