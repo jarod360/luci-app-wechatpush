@@ -555,6 +555,23 @@ time_for_humans() {
 	fi
 }
 
+# 在线设备清单专用时长格式：不足两位补 0。
+format_device_uptime() {
+	local elapsed="${1:-0}" days hours minutes seconds
+	[ "$elapsed" -lt 0 ] && elapsed=0
+	days=$((elapsed / 86400))
+	hours=$(((elapsed % 86400) / 3600))
+	minutes=$(((elapsed % 3600) / 60))
+	seconds=$((elapsed % 60))
+	if [ "$days" -gt 0 ]; then
+		printf '%sd %02d:%02d:%02d' "$days" "$hours" "$minutes" "$seconds"
+	elif [ "$elapsed" -ge 3600 ]; then
+		printf '%02d:%02d:%02d' "$hours" "$minutes" "$seconds"
+	else
+		printf '%02d:%02d' "$minutes" "$seconds"
+	fi
+}
+
 # 计算字符串显示宽度
 length_str() {
 	[ -z "$1" ] && return
@@ -1073,7 +1090,9 @@ qwrt_traffic_for_ip() {
 	upload=$(printf '%s' "$response" | jq -r --arg mac "$mac" '.traffic[$mac].upload // empty' 2>/dev/null)
 	download=$(printf '%s' "$response" | jq -r --arg mac "$mac" '.traffic[$mac].download // empty' 2>/dev/null)
 	[ -n "$upload" ] && [ -n "$download" ] || return 1
-	if [ "$mode" = "download" ]; then
+	if [ "$mode" = "raw" ]; then
+		printf '%s %s' "$upload" "$download"
+	elif [ "$mode" = "download" ]; then
 		printf '%s' "$(format_traffic_bytes "$download")"
 	elif [ "$mode" = "mpnews" ]; then
 		printf '↑ %s / ↓ %s' "$(format_traffic_bytes "$upload")" "$(format_traffic_bytes "$download")"
@@ -2036,135 +2055,146 @@ down() {
 	silent_run LockFile unlock
 }
 
+
 # 当前设备列表
 current_device() {
-	# 定时推送中已有设备列表选项，不应被精简模式设置项控制
 	[ ! -f "${dir}/send_pid" ] && {
 		(echo "$lite_enable" | grep -q "content") || (echo "$lite_enable" | grep -q "device") && return
 	}
 	local logrow=$(jq '.devices | map(select(.status == "online")) | length' "$devices_json")
 	local has_usage=0
 	[ "$qwrt_traffic_enable" = "1" ] && has_usage=2
-	
 	[ "$logrow" -eq "0" ] && {
-		local explain="${send_content}\
-${str_splitline}\
-${str_title_start}$(translate "Currently no online devices")${str_title_end}"
+		local explain="${send_content}${str_splitline}${str_title_start}$(translate "Currently no online devices")${str_title_end}"
 		content="${content}${explain}${header}"
 		return
 	}
-
-	local explain="${str_splitline}\
-${str_title_start}$(translate "Currently %d online devices, details below" "$logrow")${str_title_end}"
-
+	local explain="${str_splitline}${str_title_start}$(translate "Currently %d online devices, details below" "$logrow")${str_title_end}"
 	local IPLIST
 	if [ -z "$defaultSortColumn" ] || [ "$defaultSortColumn" = "ip" ]; then
-		# 按 IP 排序
 		IPLIST=$(jq -r '.devices[] | select(.status == "online") | .ip' "$devices_json" | sort -uV)
 	else
-		# 按在线时间（短到长）
 		IPLIST=$(jq -r '.devices | sort_by(-(.uptime | tonumber)) | .[] | select(.status == "online") | .ip' "$devices_json")
 	fi
-
-	# 定义数组，预处理
-	declare -a ips totals time_onlines names
+	declare -a ips traffic_values time_onlines names
 	local idx=0
-
+	local name_header="$(translate "Client Name:")"
+	local ip_header="$(translate "IP Address")"
+	local time_header="$(translate "Online time")"
+	local traffic_header=""
+	local is_mpnews=0
+	local is_text=0
+	if [ "$has_usage" -eq 2 ]; then
+		if [[ "$jsonpath" == *"/qywx_mpnews.json" ]]; then
+			is_mpnews=1
+			traffic_header="$(translate "Upload / Download")"
+		elif [[ "$jsonpath" == *"/qywx_markdown.json" ]]; then
+			is_text=1
+			traffic_header="$(translate "Download Traffic:")"
+		else
+			traffic_header="$(translate "Upload / Download")"
+		fi
+	fi
 	for ip in $IPLIST; do
-		local mac total name time_up time_online
+		local mac name time_up time_online traffic raw_traffic upload_bytes download_bytes total_bytes
 		mac=$(getmac "$ip")
+		name=$(getname "$ip" "$mac")
+		name=$(cut_str "$name" "16")
+		time_up=$(jq -r --arg ip "$ip" '.devices[] | select(.ip == $ip) | .uptime' "$devices_json")
+		time_online=$(format_device_uptime "$(( $(date +%s) - time_up ))")
+		traffic=""
 		if [ "$has_usage" -eq 2 ]; then
-			if [[ "$jsonpath" == *"/qywx_mpnews.json" ]]; then
-				total=$(qwrt_traffic_for_ip "$ip" mpnews) || total="-"
-			elif [[ "$jsonpath" == *"/qywx_markdown.json" ]]; then
-				total=$(qwrt_traffic_for_ip "$ip" download) || total="-"
+			raw_traffic=$(qwrt_traffic_for_ip "$ip" raw) || raw_traffic=""
+			if [ -n "$raw_traffic" ]; then
+				read -r upload_bytes download_bytes <<<"$raw_traffic"
+				[[ "$upload_bytes" =~ ^[0-9]+$ ]] || upload_bytes=0
+				[[ "$download_bytes" =~ ^[0-9]+$ ]] || download_bytes=0
 			else
-				total=$(qwrt_traffic_for_ip "$ip") || total="-"
+				upload_bytes=""
+				download_bytes=""
+			fi
+			if [ "$is_mpnews" -eq 1 ]; then
+				if [ -n "$upload_bytes" ]; then
+					traffic="$(translate "Upload Traffic:") $(format_traffic_bytes "$upload_bytes") / $(translate "Download Traffic:") $(format_traffic_bytes "$download_bytes")"
+				else
+					traffic="$(translate "Upload Traffic:") - / $(translate "Download Traffic:") -"
+				fi
+			elif [ "$is_text" -eq 1 ]; then
+				if [ -n "$download_bytes" ]; then
+					traffic="$(translate "Download Traffic:") $(format_traffic_bytes "$download_bytes")"
+				else
+					traffic="$(translate "Download Traffic:") -"
+				fi
+			else
+				if [ -n "$upload_bytes" ]; then
+					total_bytes=$((upload_bytes + download_bytes))
+					traffic="$(translate "Upload Traffic:") $(format_traffic_bytes "$upload_bytes") / $(translate "Download Traffic:") $(format_traffic_bytes "$download_bytes") / $(translate "Total Traffic:") $(format_traffic_bytes "$total_bytes")"
+				else
+					traffic="$(translate "Upload Traffic:") - / $(translate "Download Traffic:") -"
+				fi
 			fi
 		fi
-		name=$(getname "$ip" "$mac")
-		name=$(cut_str "$name" "12")
-		time_up=$(jq -r --arg ip "$ip" '.devices[] | select(.ip == $ip) | .uptime' "$devices_json")
-		time_online=$(time_for_humans "$(( $(date +%s) - time_up ))")
-
 		ips[idx]="$ip"
-		totals[idx]="$total"
+		traffic_values[idx]="$traffic"
 		time_onlines[idx]="$time_online"
 		names[idx]="$name"
 		idx=$((idx + 1))
 	done
 
-	# 计算每列的最大宽度
-	local ip_max=0 total_max=0 time_online_max=0
+	local name_max ip_max time_max traffic_max
+	name_max=$(length_str "$name_header")
+	ip_max=$(length_str "$ip_header")
+	time_max=$(length_str "$time_header")
+	traffic_max=$(length_str "$traffic_header")
 	for i in "${!ips[@]}"; do
-		local len_ip len_total len_time_online
-		len_ip=$(length_str "${ips[i]}")
-		[ "$len_ip" -gt "$ip_max" ] && ip_max=$len_ip
-
-		if [ "$has_usage" -ne 0 ]; then
-			len_total=$(length_str "${totals[i]}")
-			[ "$len_total" -gt "$total_max" ] && total_max=$len_total
+		local width
+		width=$(length_str "${names[i]}")
+		[ "$width" -gt "$name_max" ] && name_max=$width
+		width=$(length_str "${ips[i]}")
+		[ "$width" -gt "$ip_max" ] && ip_max=$width
+		width=$(length_str "${time_onlines[i]}")
+		[ "$width" -gt "$time_max" ] && time_max=$width
+		if [ "$has_usage" -eq 2 ]; then
+			width=$(length_str "${traffic_values[i]}")
+			[ "$width" -gt "$traffic_max" ] && traffic_max=$width
 		fi
-
-		len_time_online=$(length_str "${time_onlines[i]}")
-		[ "$len_time_online" -gt "$time_online_max" ] && time_online_max=$len_time_online
 	done
-
-	# 每列宽度 = 最大宽度 + 2*${str_space}
+	name_max=$((name_max + 2))
 	ip_max=$((ip_max + 2))
-	if [ "$has_usage" -ne 0 ]; then
-		total_max=$((total_max + 2))
-	fi
-	time_online_max=$((time_online_max + 2))
+	time_max=$((time_max + 2))
+	[ "$has_usage" -eq 2 ] && traffic_max=$((traffic_max + 2))
 
-	# 如果字符长度小于最大宽度，用 str_space 填充
 	pad_field() {
-		local field="$1"
-		local target_width=$2
+		local field="$1" target_width="$2"
 		local current_width=$(length_str "$field")
-		local pad_count=$(( target_width - current_width ))
-		local pad=$(printf "%${pad_count}s" "" | sed "s/ /${str_space}/g")
+		local missing=$((target_width - current_width))
+		local space_width=1
+		[ "$str_space" = "　" ] && space_width=2
+		[ "$missing" -lt 0 ] && missing=0
+		local pad_count=$(((missing + space_width - 1) / space_width))
+		local pad=""
+		local pad_index
+		for ((pad_index = 0; pad_index < pad_count; pad_index++)); do
+			pad="${pad}${str_space}"
+		done
 		printf "%s%s" "$field" "$pad"
 	}
-
-	# 表头
-	local explain="${str_splitline}\
-${str_title_start}$(translate "Currently %d online devices, details below" "$logrow")${str_title_end}"
-
-	local header="${str_linefeed}${str_tab}"
-	header+=$(pad_field "$(translate "IP Address")" "$ip_max")"${str_space}"
-	if [ "$has_usage" -eq 2 ]; then
-		if [[ "$jsonpath" == *"/qywx_mpnews.json" ]]; then
-			header+=$(pad_field "↑ Upload / ↓ Download" "$total_max")
-		elif [[ "$jsonpath" == *"/qywx_markdown.json" ]]; then
-			header+=$(pad_field "↓ Download" "$total_max")
-		else
-			header+=$(pad_field "↑ Upload / ↓ Download / Σ Total" "$total_max")
-		fi
-	elif [ "$has_usage" -eq 1 ]; then
-		header+=$(pad_field "$(translate "Total Traffic")" "$total_max")
-	fi
-	header+=$(pad_field "$(translate "Uptime")" "$time_online_max")
-	header+=$(translate "Client Name")
-
-	content="${content}${explain}${header}"
-
-	# 内容
+	local list_header="${str_linefeed}${str_tab}"
+	list_header+=$(pad_field "$name_header" "$name_max")
+	list_header+=$(pad_field "$ip_header" "$ip_max")
+	list_header+=$(pad_field "$time_header" "$time_max")
+	[ "$has_usage" -eq 2 ] && list_header+=$(pad_field "$traffic_header" "$traffic_max")
+	content="${content}${explain}${list_header}"
 	for i in "${!ips[@]}"; do
 		local line="${str_linefeed}${str_tab}"
+		line+=$(pad_field "${names[i]}" "$name_max")
 		line+=$(pad_field "${ips[i]}" "$ip_max")
-		if [ "$has_usage" -ne 0 ]; then
-			line+=$(pad_field "${totals[i]}" "$total_max")
-		fi
-		line+=$(pad_field "${time_onlines[i]}" "$time_online_max")
-		line+="${names[i]}"
-
+		line+=$(pad_field "${time_onlines[i]}" "$time_max")
+		[ "$has_usage" -eq 2 ] && line+=$(pad_field "${traffic_values[i]}" "$traffic_max")
 		content="${content}${line}"
 	done
-
 	[ -f "${dir}/send_pid" ] && echo "$content" >"$output_dir/current_device" && unset content
 }
-
 # 无人值守任务
 unattended() {
 	[ -z "$unattended_enable" ] || [ "$unattended_enable" -ne "1" ] && return
@@ -3137,16 +3167,22 @@ down_send() {
 
 		local name=$(getname "$ip" "$mac")
 		local time_up=$(jq -r --arg ip "$ip" '.devices[] | select(.ip == $ip and .status == "offline") | .uptime' "$devices_json")
-		local ip_total
+		local ip_total="" raw_traffic upload_bytes download_bytes total_bytes
 		if [ "$qwrt_traffic_enable" = "1" ]; then
-			if [[ "$jsonpath" == *"/qywx_mpnews.json" ]]; then
-				ip_total=$(qwrt_traffic_for_ip "$ip" mpnews)
-			elif [[ "$jsonpath" == *"/qywx_markdown.json" ]]; then
-				ip_total=$(qwrt_traffic_for_ip "$ip" download)
-			else
-				ip_total=$(qwrt_traffic_for_ip "$ip")
+			raw_traffic=$(qwrt_traffic_for_ip "$ip" raw) || raw_traffic=""
+			if [ -n "$raw_traffic" ]; then
+				read -r upload_bytes download_bytes <<<"$raw_traffic"
+				[[ "$upload_bytes" =~ ^[0-9]+$ ]] || upload_bytes=0
+				[[ "$download_bytes" =~ ^[0-9]+$ ]] || download_bytes=0
+				if [[ "$jsonpath" == *"/qywx_markdown.json" ]]; then
+					ip_total="${str_linefeed}${str_tab} - $(translate "Download Traffic:") $(format_traffic_bytes "$download_bytes")"
+				elif [[ "$jsonpath" == *"/qywx_mpnews.json" ]]; then
+					ip_total="${str_linefeed}${str_tab} - $(translate "Upload Traffic:") $(format_traffic_bytes "$upload_bytes") / $(translate "Download Traffic:") $(format_traffic_bytes "$download_bytes")"
+				else
+					total_bytes=$((upload_bytes + download_bytes))
+					ip_total="${str_linefeed}${str_tab} - $(translate "Upload Traffic:") $(format_traffic_bytes "$upload_bytes") / $(translate "Download Traffic:") $(format_traffic_bytes "$download_bytes") / $(translate "Total Traffic:") $(format_traffic_bytes "$total_bytes")"
+				fi
 			fi
-			[ -n "$ip_total" ] && { if [ "$qwrt_traffic_enable" = "1" ]; then if [[ "$jsonpath" == *"/qywx_markdown.json" ]]; then ip_total="${str_linefeed}${str_tab} - Download: ${ip_total}"; else ip_total="${str_linefeed}${str_tab} - Upload / Download: ${ip_total}"; fi; else ip_total="${str_linefeed}${str_tab} - $(translate "Total Traffic:") ${str_space}${str_space}${str_space}${str_space}${ip_total}"; fi; }
 		fi
 		local time1=$(date +%s)
 		local time1=$(time_for_humans $(expr ${time1} - ${time_up}))
