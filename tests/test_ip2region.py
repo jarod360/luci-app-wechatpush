@@ -45,14 +45,14 @@ with tempfile.TemporaryDirectory() as tmp:
     write_xdb(legacy_db, "中国|北京|北京|电信|CN")
     result = lookup(legacy_db)
     assert result.returncode == 0
-    assert result.stdout == "中国 北京 北京 电信 CN", result.stdout
+    assert result.stdout == "北京", result.stdout
 
     # Mainland records: omit continent and county, retain city and ISP.
     mainland_db = tmp / "mainland.xdb"
     write_xdb(mainland_db, "亚洲|中国|宁夏回族自治区|中卫市|海原县|联通")
     result = lookup(mainland_db)
     assert result.returncode == 0
-    assert result.stdout == "中国 宁夏回族自治区 中卫市 联通", result.stdout
+    assert result.stdout == "中卫市", result.stdout
 
     # Hong Kong records: omit continent and district, retain city and ASN.
     hong_kong_db = tmp / "hong-kong.xdb"
@@ -62,9 +62,17 @@ with tempfile.TemporaryDirectory() as tmp:
     )
     result = lookup(hong_kong_db)
     assert result.returncode == 0
-    assert result.stdout == (
-        "中国香港 葵涌 DMIT Cloud Services AS906"
-    ), result.stdout
+    assert result.stdout == "中国香港 葵涌", result.stdout
+
+    # Foreign locations retain country and city, but omit province/district and ASN.
+    foreign_db = tmp / "foreign.xdb"
+    write_xdb(
+        foreign_db,
+        "Europe|United States|California|Los Angeles|Los Angeles County|Example ISP AS123",
+    )
+    result = lookup(foreign_db)
+    assert result.returncode == 0
+    assert result.stdout == "United States Los Angeles", result.stdout
 
     missing = lookup(legacy_db, "1.2.3.5")
     assert missing.returncode != 0 and not missing.stdout, (
