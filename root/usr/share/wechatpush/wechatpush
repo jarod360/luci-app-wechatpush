@@ -501,21 +501,23 @@ main() {
 		done <<<"$tmp_ip_list"
 		fi
 
-		# 同一轮 first() 已等待全部设备检测任务结束；把本轮所有连接/断开事件合并成一条推送。
+		# 同一轮 first() 已等待全部设备检测任务结束；按事件类型统一汇总连接/断开标题。
 		if [ -s "${dir}/device_events" ]; then
 			device_event_count=$(grep -c . "${dir}/device_events" 2>/dev/null)
 			device_event_count=${device_event_count:-0}
+			local first_event=$(sed -n '1p' "${dir}/device_events")
+			local first_event_type first_event_name first_event_title
+			IFS=$'\t' read -r first_event_type first_event_name first_event_title <<<"$first_event"
+			local connected_event_count=$(awk -F '\\t' '$1 == "connected" { count++ } END { print count+0 }' "${dir}/device_events")
+			local disconnected_event_count=$(awk -F '\\t' '$1 == "disconnected" { count++ } END { print count+0 }' "${dir}/device_events")
 			if [ "$device_event_count" -eq 1 ]; then
-				title=$(sed -n '1p' "${dir}/device_events")
-			elif [ "$device_event_count" -gt 1 ]; then
-				local first_event=$(sed -n '1p' "${dir}/device_events")
-				if [ "$(grep -c ' 断开连接 [0-9][0-9][0-9][0-9]-' "${dir}/device_events")" -eq "$device_event_count" ]; then
-					local first_name="${first_event% 断开连接 *}"
-					local event_time="${first_event##* 断开连接 }"
-					title="${first_name} 等${device_event_count}台断开连接 ${event_time}"
-				else
-					title="客户端状态变化（${device_event_count}台）"
-				fi
+				title="$first_event_title"
+			elif [ "$connected_event_count" -eq "$device_event_count" ]; then
+				title="${first_event_name} 等 ${device_event_count} 台设备连接"
+			elif [ "$disconnected_event_count" -eq "$device_event_count" ]; then
+				title="${first_event_name} 等 ${device_event_count} 台设备断开连接"
+			else
+				title="客户端状态变化（${device_event_count}台）"
 			fi
 		fi
 
