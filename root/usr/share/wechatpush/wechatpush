@@ -590,13 +590,14 @@ length_str() {
 			display_width=$((display_width + 2))
 		elif [ "$byte_code" -ge 224 ] && [ "$byte_code" -le 239 ]; then
 			char_bytes=3
-			display_width=$((display_width + 2))
+			# E0-E2 常见于符号、箭头等，按 1 列计算；E3-EF 常见于中日韩宽字符。
+			if [ "$byte_code" -le 226 ]; then
+				display_width=$((display_width + 1))
+			else
+				display_width=$((display_width + 2))
+			fi
 		elif [ "$byte_code" -ge 192 ] && [ "$byte_code" -le 223 ]; then
 			char_bytes=2
-			display_width=$((display_width + 1))
-		elif [ "$byte_code" -ge 224 ] && [ "$byte_code" -le 226 ]; then
-			# U+0800 至 U+2FFF 的字符及箭头等符号通常按 1 列显示。
-			char_bytes=3
 			display_width=$((display_width + 1))
 		else
 			# 非法 UTF-8 字节或孤立 continuation byte，按 1 列处理。
@@ -629,12 +630,9 @@ cut_str() {
 			char_width=2
 		elif [ "$byte_code" -ge 224 ] && [ "$byte_code" -le 239 ]; then
 			char_bytes=3
-			char_width=2
+			if [ "$byte_code" -le 226 ]; then char_width=1; else char_width=2; fi
 		elif [ "$byte_code" -ge 192 ] && [ "$byte_code" -le 223 ]; then
 			char_bytes=2
-			char_width=1
-		elif [ "$byte_code" -ge 224 ] && [ "$byte_code" -le 226 ]; then
-			char_bytes=3
 			char_width=1
 		else
 			char_bytes=1
