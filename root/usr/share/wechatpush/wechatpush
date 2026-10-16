@@ -2152,7 +2152,7 @@ up() {
 			detail_width=$(max_display_width "$label_name" "$label_ip" "$label_mac" "$label_interface" "$label_signal")
 			detail_width=$((detail_width + 2))
 
-			content="${str_splitline}${content_title}$(format_detail_line "$label_name" "$ip_name" "$detail_width")$(format_detail_line "$label_ip" "$ip" "$detail_width")$(format_detail_line "$label_mac" "$mac" "$detail_width")$(format_detail_line "$label_interface" "$interface" "$detail_width")"
+			content="${str_splitline}${content_title}$(format_detail_line "$label_name" "$name" "$detail_width")$(format_detail_line "$label_ip" "$ip" "$detail_width")$(format_detail_line "$label_mac" "$mac" "$detail_width")$(format_detail_line "$label_interface" "$interface" "$detail_width")"
 			[ -n "$up_dbm" ] && content="${content}$(format_detail_line "$label_signal" "$up_dbm dBm" "$detail_width")"
 
 			local up_log=$(translate "New device %s %s connected" "$name" "$ip")
