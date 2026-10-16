@@ -2115,22 +2115,22 @@ current_device() {
 			fi
 			if [ "$is_mpnews" -eq 1 ]; then
 				if [ -n "$upload_bytes" ]; then
-					traffic="$(translate "Upload Traffic:") $(format_traffic_bytes "$upload_bytes") / $(translate "Download Traffic:") $(format_traffic_bytes "$download_bytes")"
+					traffic="↑ $(format_traffic_bytes "$upload_bytes") / ↓ $(format_traffic_bytes "$download_bytes")"
 				else
-					traffic="$(translate "Upload Traffic:") - / $(translate "Download Traffic:") -"
+					traffic="↑ - / ↓ -"
 				fi
 			elif [ "$is_text" -eq 1 ]; then
 				if [ -n "$download_bytes" ]; then
-					traffic="$(translate "Download Traffic:") $(format_traffic_bytes "$download_bytes")"
+					traffic="↓ $(format_traffic_bytes "$download_bytes")"
 				else
-					traffic="$(translate "Download Traffic:") -"
+					traffic="↓ -"
 				fi
 			else
 				if [ -n "$upload_bytes" ]; then
 					total_bytes=$((upload_bytes + download_bytes))
-					traffic="$(translate "Upload Traffic:") $(format_traffic_bytes "$upload_bytes") / $(translate "Download Traffic:") $(format_traffic_bytes "$download_bytes") / $(translate "Total Traffic:") $(format_traffic_bytes "$total_bytes")"
+					traffic="↑ $(format_traffic_bytes "$upload_bytes") / ↓ $(format_traffic_bytes "$download_bytes") / Σ $(format_traffic_bytes "$total_bytes")"
 				else
-					traffic="$(translate "Upload Traffic:") - / $(translate "Download Traffic:") -"
+					traffic="↑ - / ↓ -"
 				fi
 			fi
 		fi
