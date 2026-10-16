@@ -205,8 +205,10 @@ jobs:
       - name: Checkout package repository
         uses: actions/checkout@v4
 
-      - name: Validate WeChat push Bash syntax
-        run: bash -n root/usr/share/wechatpush/wechatpush
+      - name: Validate WeChat push Bash and Lua syntax
+        run: |
+          bash -n root/usr/share/wechatpush/wechatpush
+          luac5.1 -p root/usr/share/wechatpush/ip2region.lua
 
       - name: Install dependencies
         run: |
