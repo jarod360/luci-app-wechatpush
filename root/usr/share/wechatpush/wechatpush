@@ -572,8 +572,7 @@ format_device_uptime() {
 	fi
 }
 
-# 计算字符串显示宽度
-# 计算字符串显示宽度（ASCII 每字节 1 列，UTF-8 非 ASCII 字符按 2 列处理）
+# 计算字符串显示宽度（按 UTF-8 字节边界计算，汉字/全角字符宽度为 2）
 length_str() {
 	local LC_ALL=C
 	local str="$1"
@@ -594,7 +593,11 @@ length_str() {
 			display_width=$((display_width + 2))
 		elif [ "$byte_code" -ge 192 ] && [ "$byte_code" -le 223 ]; then
 			char_bytes=2
-			display_width=$((display_width + 2))
+			display_width=$((display_width + 1))
+		elif [ "$byte_code" -ge 224 ] && [ "$byte_code" -le 226 ]; then
+			# U+0800 至 U+2FFF 的字符及箭头等符号通常按 1 列显示。
+			char_bytes=3
+			display_width=$((display_width + 1))
 		else
 			# 非法 UTF-8 字节或孤立 continuation byte，按 1 列处理。
 			char_bytes=1
@@ -629,7 +632,10 @@ cut_str() {
 			char_width=2
 		elif [ "$byte_code" -ge 192 ] && [ "$byte_code" -le 223 ]; then
 			char_bytes=2
-			char_width=2
+			char_width=1
+		elif [ "$byte_code" -ge 224 ] && [ "$byte_code" -le 226 ]; then
+			char_bytes=3
+			char_width=1
 		else
 			char_bytes=1
 			char_width=1
