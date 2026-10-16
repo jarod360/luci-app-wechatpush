@@ -1241,9 +1241,15 @@ getping() {
 	local mac="$2"
 	local timeout="$3"
 	local retry_count="$4"
+	local check_mode="$5"
 
 	# 开启时使用 QWRT 概览自己的 ARP/MAC 判断；关闭时继续执行下方原始检测代码。
 	if [ "$qwrt_online_enable" = "1" ]; then
+		# 新设备上线前等待指定时间，再刷新一次 ARP 快照，避免瞬时 ARP 条目触发上线通知。
+		if [ "$check_mode" = "up" ] && [[ "$timeout" =~ ^[0-9]+$ ]] && [ "$timeout" -gt 0 ]; then
+			sleep "$timeout"
+			refresh_qwrt_overview_arp
+		fi
 		qwrt_overview_mac_online "$mac"
 		return $?
 	fi
@@ -2164,7 +2170,7 @@ up() {
 
 	jq -e --arg ip "$ip" '.devices[] | select(.ip == $ip and .status == "online") | .ip' "$devices_json" >/dev/null && return # 如果当前 IP 为在线，退出
 	local mac=$(getmac "$ip")
-	getping "$ip" "$mac" "$up_timeout" "1"
+	getping "$ip" "$mac" "$up_timeout" "1" "up"
 	local ping_online=$?
 
 	# 连通
@@ -2263,8 +2269,21 @@ down() {
 	# 离线，置入待验证区
 	if [ "$ping_online" -eq "1" ]; then
 		if [ "$qwrt_online_enable" = "1" ]; then
-			# QWRT 原生模式已按概览相同的 ARP/MAC 规则判定，本轮直接转为 offline。
-			jq --arg ip "$ip" '.devices |= map(if .ip == $ip then .status = "offline" else . end)' "$devices_json" >"$tmp_devices_json" && mv "$tmp_devices_json" "$devices_json"
+			# 原生检测首次发现缺失时只进入待确认状态；后续按配置累计复查次数和离线时长。
+			local now=$(date +%s)
+			local pending_since=$(jq -r --arg ip "$ip" '.devices[] | select(.ip == $ip) | .qwrt_offline_since // empty' "$devices_json")
+			local pending_retries=$(jq -r --arg ip "$ip" '.devices[] | select(.ip == $ip) | .qwrt_offline_retries // empty' "$devices_json")
+			[[ "$pending_since" =~ ^[0-9]+$ ]] || pending_since="$now"
+			[[ "$pending_retries" =~ ^[0-9]+$ ]] || pending_retries=0
+			if [ "$pending_since" -ne "$now" ] || jq -e --arg ip "$ip" '.devices[] | select(.ip == $ip and has("qwrt_offline_since"))' "$devices_json" >/dev/null; then
+				pending_retries=$((pending_retries + 1))
+			fi
+			local offline_elapsed=$((now - pending_since))
+			if [ "$pending_retries" -ge "$tmp_retry_count" ] && [ "$offline_elapsed" -ge "$tmp_timeout" ]; then
+				jq --arg ip "$ip" '.devices |= map(if .ip == $ip then .status = "offline" | del(.qwrt_offline_since, .qwrt_offline_retries) else . end)' "$devices_json" >"$tmp_devices_json" && mv "$tmp_devices_json" "$devices_json"
+			else
+				jq --arg ip "$ip" --argjson since "$pending_since" --argjson retries "$pending_retries" '.devices |= map(if .ip == $ip then .status = "unknown" | .qwrt_offline_since = $since | .qwrt_offline_retries = $retries else . end)' "$devices_json" >"$tmp_devices_json" && mv "$tmp_devices_json" "$devices_json"
+			fi
 		# 关闭 QWRT 原生检测时，完整保留原有 unknown -> offline 二次确认流程。
 		elif jq -e --arg ip "$ip" '.devices[] | select(.ip == $ip and .status == "online") | .ip' "$devices_json" >/dev/null; then
 			jq --arg ip "$ip" '.devices |= map(if .ip == $ip then .status = "unknown" else . end)' "$devices_json" >"$tmp_devices_json" && mv "$tmp_devices_json" "$devices_json"
@@ -2273,6 +2292,10 @@ down() {
 		fi
 	# 更新设备信息
 	else
+		# 原生检测下设备在待离线期间恢复，立即恢复 online 并清除防抖计数，不产生重新上线事件。
+		if [ "$qwrt_online_enable" = "1" ]; then
+			jq --arg ip "$ip" '.devices |= map(if .ip == $ip then .status = "online" | del(.qwrt_offline_since, .qwrt_offline_retries) else . end)' "$devices_json" >"$tmp_devices_json" && mv "$tmp_devices_json" "$devices_json"
+		fi
 		local name=$(getname "$ip" "$mac")
 		local interface=$(getinterface "$ip" "$mac")
 
