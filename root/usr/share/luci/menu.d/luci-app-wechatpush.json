@@ -18,11 +18,11 @@
 		"action": {
 			"type": "view",
 			"path": "wechatpush/config"
-		}
-,
+		},
 		"depends": {
 			"acl": [ "luci-app-wechatpush" ]
-		}	},
+		}
+	},
 
 	"admin/services/wechatpush/advanced": {
 		"title": "Advance Setting",
@@ -30,11 +30,11 @@
 		"action": {
 			"type": "view",
 			"path": "wechatpush/advanced"
-		}
-,
+		},
 		"depends": {
 			"acl": [ "luci-app-wechatpush" ]
-		}	},
+		}
+	},
 
 	"admin/services/wechatpush/client": {
 		"title": "Online Devices",
@@ -42,21 +42,21 @@
 		"action": {
 			"type": "view",
 			"path": "wechatpush/client"
-		}
-,
+		},
 		"depends": {
 			"acl": [ "luci-app-wechatpush" ]
-		}	},
+		}
+	},
+
 	"admin/services/wechatpush/log": {
 		"title": "Log",
 		"order": 40,
 		"action": {
 			"type": "view",
 			"path": "wechatpush/log"
-		}
-,
+		},
 		"depends": {
 			"acl": [ "luci-app-wechatpush" ]
-		}	}
-
+		}
+	}
 }
