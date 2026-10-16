@@ -773,7 +773,12 @@ max_display_width() {
 # 输出一条按模板对齐的设备详情行。
 format_detail_line() {
 	local label="$1" value="$2" target_width="$3"
-	printf '%s%s - %s%s' "$str_linefeed" "$str_tab" "$(pad_field "$label" "$target_width")" "$value"
+	# 纯文字版详情标签后直接接内容，避免为对齐标签插入多余全角空格。
+	if [[ "$jsonpath" == *"/qywx_markdown.json" ]]; then
+		printf '%s%s - %s%s' "$str_linefeed" "$str_tab" "$label" "$value"
+	else
+		printf '%s%s - %s%s' "$str_linefeed" "$str_tab" "$(pad_field "$label" "$target_width")" "$value"
+	fi
 }
 
 # 图文消息使用真实 HTML 表格统一列宽；纯文字/Markdown 继续使用空格排版。
@@ -2424,12 +2429,10 @@ current_device() {
 			[ "$width" -gt "$traffic_max" ] && traffic_max=$width
 		fi
 	done
-	# 各列之间保留两个显示单位；纯文字版自动换算全角与半角空格。
+	# 纯文字版列间仅保留一个全角空格；最后一列不再添加无用尾部空格。
 	name_max=$((name_max + 2))
 	ip_max=$((ip_max + 2))
-	# 在线时间列额外增加一个显示占位，避免较长时长挤压到下一列。
-	time_max=$((time_max + 3))
-	[ "$has_usage" -eq 2 ] && traffic_max=$((traffic_max + 2))
+	time_max=$((time_max + 2))
 
 	if [ "$is_mpnews" -eq 1 ]; then
 		# 图文版使用真实 HTML 表格，避免依赖空格宽度模拟列对齐。
