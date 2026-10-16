@@ -1172,7 +1172,8 @@ check_http_access() {
 # 缓存 QWRT 概览使用的 ARP 数据；其 /usr/libexec/luci-arp 默认就是读取 /proc/net/arp。
 refresh_qwrt_overview_arp() {
 	local cache="${dir}/qwrt_overview_arp"
-	local tmp="${cache}.tmp"
+	# 多个上线检测线程可能同时刷新快照，使用各自的临时文件再原子替换。
+	local tmp="${cache}.tmp.$"
 
 	if [ -x /usr/libexec/luci-arp ]; then
 		/usr/libexec/luci-arp >"$tmp" 2>/dev/null
