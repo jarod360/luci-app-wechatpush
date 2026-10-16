@@ -573,64 +573,94 @@ format_device_uptime() {
 }
 
 # 计算字符串显示宽度
+# 计算字符串显示宽度（ASCII 每字节 1 列，UTF-8 非 ASCII 字符按 2 列处理）
 length_str() {
-	[ -z "$1" ] && return
+	local LC_ALL=C
+	local str="$1"
+	[ -z "$str" ] && { echo 0; return; }
 
-	local result
-	# 调试模式不要输出信息
-	{
-		local str="$1"
-		local length=0
+	local i=0 byte_count=${#str} display_width=0 byte byte_code char_bytes
+	while [ "$i" -lt "$byte_count" ]; do
+		byte="${str:$i:1}"
+		printf -v byte_code '%d' "'$byte"
+		if [ "$byte_code" -lt 128 ]; then
+			char_bytes=1
+			display_width=$((display_width + 1))
+		elif [ "$byte_code" -ge 240 ] && [ "$byte_code" -le 247 ]; then
+			char_bytes=4
+			display_width=$((display_width + 2))
+		elif [ "$byte_code" -ge 224 ] && [ "$byte_code" -le 239 ]; then
+			char_bytes=3
+			display_width=$((display_width + 2))
+		elif [ "$byte_code" -ge 192 ] && [ "$byte_code" -le 223 ]; then
+			char_bytes=2
+			display_width=$((display_width + 2))
+		else
+			# 非法 UTF-8 字节或孤立 continuation byte，按 1 列处理。
+			char_bytes=1
+			display_width=$((display_width + 1))
+		fi
+		i=$((i + char_bytes))
+	done
 
-		while IFS= read -r -n1 char; do
-			local char_width
-			char_width=$(printf "%s" "$char" | awk '{
-				if (match($0, /[一-龥]/)) print 2;
-				else print 1;
-			}')
-
-			length=$((length + char_width))
-		done <<< "$str"
-
-		result="$length"
-	} > /dev/null 2>&1
-
-	echo "$result"
+	echo "$display_width"
 }
 
-# 字符串显示宽度处理
+# 字符串显示宽度裁剪，按 UTF-8 字符边界截断，避免中文被拆成乱码
 cut_str() {
-	[ -z "$1" ] && return
-		[ -z "$2" ] && return
-	local result
-	# 调试模式不要输出信息
-	{
-		local str="$1"
-		local max_width="$2"
-		local current_width=0
+	[ -z "$2" ] && return
+	local LC_ALL=C
+	local str="$1"
+	local max_width="$2"
+	local result=""
+	local i=0 byte_count=${#str} current_width=0 byte byte_code char_bytes char_width char
 
-		# 遍历字符串的每个字符
-		for ((i = 0; i < ${#str}; i++)); do
-			local char="${str:$i:1}"
-			local char_width=$(length_str "$char")
-
-			# 如果当前宽度加上当前字符的宽度超过最大宽度，则停止
-			if [ $((current_width + char_width)) -gt "$max_width" ]; then
-				break
-			fi
-
-			result="${result}${char}"
-			current_width=$((current_width + char_width))
-		done
-
-		# 如果裁剪了字符串，则添加 ".."
-		if [ "$current_width" -lt $(length_str "$str") ]; then
-			result=$(echo "$result" | sed 's/ *$//')
-			result="${result}.."
+	while [ "$i" -lt "$byte_count" ]; do
+		byte="${str:$i:1}"
+		printf -v byte_code '%d' "'$byte"
+		if [ "$byte_code" -lt 128 ]; then
+			char_bytes=1
+			char_width=1
+		elif [ "$byte_code" -ge 240 ] && [ "$byte_code" -le 247 ]; then
+			char_bytes=4
+			char_width=2
+		elif [ "$byte_code" -ge 224 ] && [ "$byte_code" -le 239 ]; then
+			char_bytes=3
+			char_width=2
+		elif [ "$byte_code" -ge 192 ] && [ "$byte_code" -le 223 ]; then
+			char_bytes=2
+			char_width=2
+		else
+			char_bytes=1
+			char_width=1
 		fi
-	} > /dev/null 2>&1
 
-	echo "$result"
+		[ "$((current_width + char_width))" -gt "$max_width" ] && break
+		char="${str:$i:$char_bytes}"
+		result="${result}${char}"
+		current_width=$((current_width + char_width))
+		i=$((i + char_bytes))
+	done
+
+	if [ "$current_width" -lt "$(length_str "$str")" ]; then
+		result=$(printf '%s' "$result" | sed 's/ *$//')
+		result="${result}.."
+	fi
+
+	printf '%s\n' "$result"
+}
+
+# 按模板生成字段间距：企业微信纯文字版统一只使用一个全角空格，
+# 其他推送模板仍保留原先指定的空格数量。
+field_spaces() {
+	local count="${1:-1}" i
+	if [[ "$jsonpath" == *"/qywx_markdown.json" ]]; then
+		printf '　'
+		return
+	fi
+	for ((i = 0; i < count; i++)); do
+		printf '%s' "$str_space"
+	done
 }
 
 # 翻译
@@ -998,10 +1028,37 @@ getping() {
 	local mac="$2"
 	local timeout="$3"
 	local retry_count="$4"
+	local interface=""
+	local wlan_online=""
+	local wifi_if=""
+	local neighbor_line=""
+	local neighbor_state=""
+	local neighbor_mac=""
+	local arp_interface=""
+	local arp_entry_count=0
+	local ip_ms=""
+	local probe_timeout=2
 
-	local interface=$(getinterface "ip" "$mac")
-	[ "$iw_version" ] && [ "$interface" ] && wlan_online=$(iw dev ${interface} station dump 2>/dev/null | grep -i -w "$mac" | grep Station) >/dev/null 2>&1
-	[ "$wlan_online" ] && {
+	[[ "$timeout" =~ ^[0-9]+$ ]] && [ "$timeout" -gt 0 ] && [ "$timeout" -lt "$probe_timeout" ] && probe_timeout="$timeout"
+	[[ "$retry_count" =~ ^[0-9]+$ ]] || retry_count=1
+	[ "$retry_count" -lt 1 ] && retry_count=1
+
+	# 使用实际 IP 查询接口；同时参考 LuCI 概览中使用的无线关联状态。
+	interface=$(getinterface "$ip" "$mac")
+	if [ -n "$mac" ] && [ "$mac" != "unknown" ]; then
+		for wifi_if in $wlan_interface; do
+			if iwinfo "$wifi_if" assoclist 2>/dev/null | grep -qiF "$mac"; then
+				wlan_online=1
+				break
+			fi
+		done
+		# 兼容未提供 iwinfo assoclist 的无线驱动。
+		if [ -z "$wlan_online" ] && [ "$iw_version" ] && [ -n "$interface" ]; then
+			iw dev "$interface" station dump 2>/dev/null | grep -i -w "$mac" | grep -q "Station" && wlan_online=1
+		fi
+	fi
+
+	[ -n "$wlan_online" ] && {
 		silent_run LockFile lock
 		jq --arg ip "$ip" --arg parent "Local" \
 			'.devices |= map(if .ip == $ip and (.parent | . != $parent) then .parent = $parent else . end)' \
@@ -1010,20 +1067,35 @@ getping() {
 		return 0
 	}
 
-	interface=$(cat /proc/net/arp | grep -w "$ip" | awk '{print $6}' | grep -v "^$" | sort -u | head -n1)
-	for i in $(seq 1 "$retry_count"); do
-		# arping 应使用 br-lan 等接口，有 WiFi 的设备接口为 wlan*，重新获取
-		[ -n "$interface" ] && local arp_entry_count=$(cat /proc/net/arp | grep '0x[26]' | grep -i -w "$mac" | wc -l 2>/dev/null)
-
-		# 避免无效的 arp 条目
-		if [ -n "$arp_entry_count" ] && [ "$arp_entry_count" -le 1 ]; then
-			ip_ms=$(run_with_tag arping -I "$interface" -c 20 -f -w "$timeout" "$ip" 2>/dev/null)
-			echo "$ip_ms" | grep -q "ms" && break || ip_ms=$(run_with_tag ping -c 5 -w 3 "$ip" 2>/dev/null | grep -v '100% packet loss')
-		else
-			ip_ms=$(run_with_tag ping -c 5 -w 3 "$ip" 2>/dev/null | grep -v '100% packet loss')
-			echo "$ip_ms" | grep -q "ms" && break || ip neigh del "$ip" dev "$interface" 2>/dev/null # 清理无效条目
+	# Linux 邻居表中 REACHABLE 且 MAC 一致的条目可直接判为在线，避免不必要的探测。
+	arp_interface=$(awk -v ip="$ip" '$1 == ip && $6 != "" { print $6; exit }' /proc/net/arp 2>/dev/null)
+	[ -n "$arp_interface" ] && interface="$arp_interface"
+	if [ -n "$interface" ] && command -v ip >/dev/null 2>&1; then
+		neighbor_line=$(ip neigh show to "$ip" dev "$interface" 2>/dev/null | head -n 1)
+		neighbor_state=$(printf '%s\n' "$neighbor_line" | awk '{print $NF}')
+		if [ "$neighbor_state" = "REACHABLE" ]; then
+			neighbor_mac=$(printf '%s\n' "$neighbor_line" | awk '{for (i=1; i<NF; i++) if ($i == "lladdr") {print $(i+1); exit}}')
+			if [ -z "$neighbor_mac" ] || [ "$mac" = "unknown" ] || [ "${neighbor_mac,,}" = "${mac,,}" ]; then
+				return 0
+			fi
 		fi
-		sleep 1
+	fi
+
+	if [ -n "$interface" ] && [ -n "$mac" ] && [ "$mac" != "unknown" ]; then
+		arp_entry_count=$(awk -v mac="$mac" 'tolower($4) == tolower(mac) && $3 != "0x0" {count++} END {print count+0}' /proc/net/arp 2>/dev/null)
+	fi
+
+	for i in $(seq 1 "$retry_count"); do
+		# 本地网段优先用少量 ARP 请求；无响应再用一次短超时 ICMP 确认。
+		if [ -n "$interface" ] && [ "$arp_entry_count" -le 1 ]; then
+			ip_ms=$(run_with_tag arping -I "$interface" -c 2 -f -w "$probe_timeout" "$ip" 2>/dev/null)
+			echo "$ip_ms" | grep -q "ms" && break
+		fi
+
+		ip_ms=$(run_with_tag ping -c 1 -W 1 "$ip" 2>/dev/null)
+		echo "$ip_ms" | grep -q "ms" && break
+		[ -n "$interface" ] && ip neigh del "$ip" dev "$interface" 2>/dev/null
+		[ "$i" -lt "$retry_count" ] && sleep 1
 	done
 	unset i
 	echo "$ip_ms" | grep -q "ms"
@@ -1968,14 +2040,14 @@ up() {
 			content="\
 ${str_splitline}\
 ${content_title}\
-${str_linefeed}${str_tab} - $(translate "Client Name:")${str_space}${str_space}${str_space}${str_space}${str_space}${name}\
-${str_linefeed}${str_tab} - $(translate "Client IP:")${str_space}${str_space}${str_space}${str_space}${ip}\
-${str_linefeed}${str_tab} - $(translate "Client MAC:")${str_space}${str_space}${str_space}${str_space}${mac}\
-${str_linefeed}${str_tab} - $(translate "Network Interface:")${str_space}${str_space}${str_space}${str_space}${str_space}${interface}"
+${str_linefeed}${str_tab} - $(translate "Client Name:")$(field_spaces 5)${name}\
+${str_linefeed}${str_tab} - $(translate "Client IP:")$(field_spaces 4)${ip}\
+${str_linefeed}${str_tab} - $(translate "Client MAC:")$(field_spaces 4)${mac}\
+${str_linefeed}${str_tab} - $(translate "Network Interface:")$(field_spaces 5)${interface}"
 
 			local up_dbm=$(get_signal_dbm "$mac")
 			[ -n "$up_dbm" ] && content="${content}\
-${str_linefeed}${str_tab} - $(translate "Signal Strength:")${str_space}${str_space}${up_dbm} dBm"
+${str_linefeed}${str_tab} - $(translate "Signal Strength:")$(field_spaces 2)${up_dbm} dBm"
 
 			local up_log=$(translate "New device %s %s connected" "$name" "$ip")
 			[ -n "$up_dbm" ] && up_log="${up_log} dbm:${up_dbm}"
@@ -2154,6 +2226,16 @@ current_device() {
 		idx=$((idx + 1))
 	done
 
+	if [ "$is_text" -eq 1 ]; then
+		local list_header="${str_linefeed}${str_tab}${name_header}${str_space}${ip_header}${str_space}${time_header}"
+		[ "$has_usage" -eq 2 ] && list_header="${list_header}${str_space}${traffic_header}"
+		content="${content}${explain}${list_header}"
+		for i in "${!ips[@]}"; do
+			local line="${str_linefeed}${str_tab}${names[i]}${str_space}${ips[i]}${str_space}${time_onlines[i]}"
+			[ "$has_usage" -eq 2 ] && line="${line}${str_space}${traffic_values[i]}"
+			content="${content}${line}"
+		done
+	else
 	local name_max ip_max time_max traffic_max
 	if [ "$is_mpnews" -eq 1 ]; then
 		# 图文版使用稳定的列宽基准，避免客户端名称长度改变整张表的排版。
@@ -2218,6 +2300,7 @@ current_device() {
 		[ "$has_usage" -eq 2 ] && line+=$(pad_field "${traffic_values[i]}" "$traffic_max")
 		content="${content}${line}"
 	done
+	fi
 	[ -f "${dir}/send_pid" ] && echo "$content" >"$output_dir/current_device" && unset content
 }
 # 无人值守任务
@@ -2278,7 +2361,7 @@ get_client_usage() {
 				local ip_name=$(getname ${ip} ${mac})
 				local tmp_usage=$(bytes_for_humans "$delta_total")
 				local time_up=$(jq -r --arg mac "$mac" '.devices[] | select((.mac | ascii_downcase) == ($mac | ascii_downcase) and .status == "online") | .uptime' "$devices_json")
-				local ip_total=$(bytes_for_humans "$cur_total") && [ -n "$ip_total" ] && local ip_total="${str_linefeed}${str_tab} - $(translate "Total Traffic:") ${str_space}${str_space}${str_space}${str_space}${ip_total}"
+				local ip_total=$(bytes_for_humans "$cur_total") && [ -n "$ip_total" ] && local ip_total="${str_linefeed}${str_tab} - $(translate "Total Traffic:") $(field_spaces 4)${ip_total}"
 				local time1=$(date +%s)
 				local time1=$(time_for_humans $(expr ${time1} - ${time_up}))
 				
@@ -2301,22 +2384,22 @@ get_client_usage() {
 					local delta_download=$((cur_download - prev_download))
 					[ "$delta_upload" -lt "0" ] && delta_upload="0"
 					[ "$delta_download" -lt "0" ] && delta_download="0"
-					detail_upload="${str_linefeed}${str_tab} - $(translate "Upload Traffic:")${str_space}${str_space}$(bytes_for_humans "$delta_upload")"
+					detail_upload="${str_linefeed}${str_tab} - $(translate "Upload Traffic:")$(field_spaces 2)$(bytes_for_humans "$delta_upload")"
 					detail_download="${str_linefeed}${str_tab} - $(translate "Download Traffic:")${str_space}$(bytes_for_humans "$delta_download")"
 				fi
 
 				local detail_dbm=""
 				local wxjk_dbm=$(get_signal_dbm "$mac")
-				[ -n "$wxjk_dbm" ] && detail_dbm="${str_linefeed}${str_tab} - $(translate "Signal Strength:")${str_space}${str_space}${wxjk_dbm} dBm"
+				[ -n "$wxjk_dbm" ] && detail_dbm="${str_linefeed}${str_tab} - $(translate "Signal Strength:")$(field_spaces 2)${wxjk_dbm} dBm"
 
 				content="\
 ${content}\
 ${content_title}\
-${str_linefeed}${str_tab} - $(translate "Client Name:")${str_space}${str_space}${str_space}${str_space}${str_space}${ip_name}\
-${str_linefeed}${str_tab} - $(translate "Client IP:")${str_space}${str_space}${str_space}${str_space}${ip}\
-${str_linefeed}${str_tab} - $(translate "Client MAC:")${str_space}${str_space}${str_space}${str_space}${mac}${ip_total}\
-${str_linefeed}${str_tab} - $(translate "Traffic in 1 minute:")${str_space}${str_space}${str_space}${tmp_usage}${detail_upload}${detail_download}\
-${str_linefeed}${str_tab} - $(translate "Uptime:")${str_space}${str_space}${str_space}${str_space}${time1}${detail_dbm}"
+${str_linefeed}${str_tab} - $(translate "Client Name:")$(field_spaces 5)${ip_name}\
+${str_linefeed}${str_tab} - $(translate "Client IP:")$(field_spaces 4)${ip}\
+${str_linefeed}${str_tab} - $(translate "Client MAC:")$(field_spaces 4)${mac}${ip_total}\
+${str_linefeed}${str_tab} - $(translate "Traffic in 1 minute:")$(field_spaces 3)${tmp_usage}${detail_upload}${detail_download}\
+${str_linefeed}${str_tab} - $(translate "Uptime:")$(field_spaces 4)${time1}${detail_dbm}"
 			fi
 		done
 		cat ${dir}/client_usage_aliases >${dir}/old_client_usage_aliases
@@ -3157,11 +3240,11 @@ login_send() {
 		fi
 
 		local login_content_time="${str_linefeed}${str_tab} - $(translate "Time:")\
-${str_space}${str_space}${str_space}${str_space}${login_time}"
+$(field_spaces 4)${login_time}"
 		local login_content_ip="${str_linefeed}${str_tab} - $(translate "Device IP:")\
-${str_space}${str_space}${login_ip}"
+$(field_spaces 2)${login_ip}"
 		[ -n "$login_ip_attribution" ] && local login_content_attribution="${str_linefeed}${str_tab} - $(translate "Location:")\
-${str_space}${str_space}${login_ip_attribution}"
+$(field_spaces 2)${login_ip_attribution}"
 		local login_content_mode="${str_linefeed}${str_tab} - $(translate "Login Method:")\
 ${str_space}${log_type_short} ${login_mode}"
 
@@ -3225,14 +3308,14 @@ down_send() {
 
 		content="${content}\
 ${content_title}\
-${str_linefeed}${str_tab} - $(translate "Client Name:")${str_space}${str_space}${str_space}${str_space}${str_space}${name}\
-${str_linefeed}${str_tab} - $(translate "Client IP:")${str_space}${str_space}${str_space}${str_space}${ip}\
-${str_linefeed}${str_tab} - $(translate "Client MAC:")${str_space}${str_space}${str_space}${str_space}${mac}${ip_total}\
-${str_linefeed}${str_tab} - $(translate "Uptime:")${str_space}${str_space}${str_space}${str_space}${time1}"
+${str_linefeed}${str_tab} - $(translate "Client Name:")$(field_spaces 5)${name}\
+${str_linefeed}${str_tab} - $(translate "Client IP:")$(field_spaces 4)${ip}\
+${str_linefeed}${str_tab} - $(translate "Client MAC:")$(field_spaces 4)${mac}${ip_total}\
+${str_linefeed}${str_tab} - $(translate "Uptime:")$(field_spaces 4)${time1}"
 
 		local down_dbm=$(get_signal_dbm "$mac")
 		[ -n "$down_dbm" ] && content="${content}\
-${str_linefeed}${str_tab} - $(translate "Signal Strength:")${str_space}${str_space}${down_dbm} dBm"
+${str_linefeed}${str_tab} - $(translate "Signal Strength:")$(field_spaces 2)${down_dbm} dBm"
 
 		local down_log=$(translate "Device %s %s disconnected" "$name" "$ip")
 		[ -n "$down_dbm" ] && down_log="${down_log} dbm:${down_dbm}"
