@@ -622,20 +622,17 @@ time_for_humans() {
 	fi
 }
 
-# 在线设备清单专用时长格式：不足两位补 0。
+# 在线设备清单专用时长格式：超过 24 小时显示天和小时；不足 24 小时显示小时和分钟。
 format_device_uptime() {
-	local elapsed="${1:-0}" days hours minutes seconds
+	local elapsed="${1:-0}" days hours minutes
 	[ "$elapsed" -lt 0 ] && elapsed=0
 	days=$((elapsed / 86400))
 	hours=$(((elapsed % 86400) / 3600))
 	minutes=$(((elapsed % 3600) / 60))
-	seconds=$((elapsed % 60))
 	if [ "$days" -gt 0 ]; then
-		printf '%sd %02d:%02d:%02d' "$days" "$hours" "$minutes" "$seconds"
-	elif [ "$elapsed" -ge 3600 ]; then
-		printf '%02d:%02d:%02d' "$hours" "$minutes" "$seconds"
+		printf '%s天%s小时' "$days" "$hours"
 	else
-		printf '%02d:%02d' "$minutes" "$seconds"
+		printf '%s小时%s分' "$((elapsed / 3600))" "$minutes"
 	fi
 }
 
@@ -2361,13 +2358,8 @@ current_device() {
 		local mac name time_up time_online traffic raw_traffic upload_bytes download_bytes total_bytes
 		mac=$(getmac "$ip")
 		name=$(getname "$ip" "$mac")
-		if [ "$is_mpnews" -eq 1 ]; then
-			# 图文版客户端名最多占 14 个显示列（7 个汉字）；仅超宽时才为省略号预留宽度。
-			local name_width
-			name_width=$(length_str "$name")
-			name_width=${name_width:-0}
-			[ "$name_width" -gt 14 ] && name=$(cut_str "$name" "12")
-		else
+		if [ "$is_mpnews" -ne 1 ]; then
+			# 图文表格由 HTML 单元格承载名称，不再额外裁剪中文设备名。
 			name=$(cut_str "$name" "16")
 		fi
 		time_up=$(jq -r --arg ip "$ip" '.devices[] | select(.ip == $ip) | .uptime' "$devices_json")
@@ -2440,13 +2432,13 @@ current_device() {
 
 	if [ "$is_mpnews" -eq 1 ]; then
 		# 图文版使用真实 HTML 表格，避免依赖空格宽度模拟列对齐。
-		local table_html="<table border='0' cellpadding='3' cellspacing='0'><tr><th align='left'>${name_header}&nbsp;&nbsp;&nbsp;&nbsp;</th><th align='left'>${ip_header}&nbsp;&nbsp;&nbsp;&nbsp;</th><th align='left'>${time_header}"
-		[ "$has_usage" -eq 2 ] && table_html="${table_html}&nbsp;&nbsp;&nbsp;&nbsp;</th><th align='left'>${traffic_header}</th>" || table_html="${table_html}</th>"
+		local table_html="<table border='0' cellpadding='3' cellspacing='0'><tr><th align='left'>${name_header}&nbsp;&nbsp;&nbsp;</th><th align='left'>${ip_header}&nbsp;&nbsp;&nbsp;</th><th align='left'>${time_header}"
+		[ "$has_usage" -eq 2 ] && table_html="${table_html}&nbsp;&nbsp;&nbsp;</th><th align='left'>${traffic_header}</th>" || table_html="${table_html}</th>"
 		table_html="${table_html}</tr>"
 		for i in "${!ips[@]}"; do
-			local line="<tr><td>${names[i]}&nbsp;&nbsp;&nbsp;&nbsp;</td><td>${ips[i]}&nbsp;&nbsp;&nbsp;&nbsp;</td><td>${time_onlines[i]}"
+			local line="<tr><td>${names[i]}&nbsp;&nbsp;&nbsp;</td><td>${ips[i]}&nbsp;&nbsp;&nbsp;</td><td>${time_onlines[i]}"
 			if [ "$has_usage" -eq 2 ]; then
-				line="${line}&nbsp;&nbsp;&nbsp;&nbsp;</td><td>${traffic_values[i]}</td>"
+				line="${line}&nbsp;&nbsp;&nbsp;</td><td>${traffic_values[i]}</td>"
 			else
 				line="${line}</td>"
 			fi
