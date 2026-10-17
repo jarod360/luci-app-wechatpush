@@ -1,106 +1,110 @@
-## 简介
+# luci-app-wechatpush
 
-[![Lastest Release](https://img.shields.io/github/release/tty228/luci-app-wechatpush.svg?style=flat)](https://github.com/tty228/luci-app-wechatpush/releases)
-[![GitHub All Releases](https://img.shields.io/github/downloads/tty228/luci-app-wechatpush/total)](https://github.com/tty228/luci-app-wechatpush/releases)
+[![Build](https://github.com/jarod360/luci-app-wechatpush/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/jarod360/luci-app-wechatpush/actions/workflows/build.yml)
+![Version](https://img.shields.io/badge/version-3.6.62-blue)
+[![License](https://img.shields.io/badge/license-GPL--2.0-blue.svg)](LICENSE)
 
-[中文文档](README.md) | [English](README_en.md)
+[简体中文](README.md) | [English](README_en.md)
 
-这是一款用于 OpenWRT 路由器上进行 微信、Telegram、邮件 通知的插件。
+## 项目简介
 
-主要功能：
-- [x] 路由 IP、IPv6 变动推送
-- [x] 设备 上线、离线 推送
-- [x] 设备在线列表及流量使用情况
-- [x] CPU 负载、温度监视、PVE 宿主机温度监控
-- [x] 路由运行状态定时推送
-- [x] 路由 Web、SSH 登录提示，自动拉黑、端口敲门
-- [x] 无人值守任务
+**luci-app-wechatpush** 是一个 OpenWrt LuCI 网络监控与消息通知插件。本仓库是基于上游 [tty228/luci-app-wechatpush](https://github.com/tty228/luci-app-wechatpush) 持续维护的 fork，在保留原有通知和监控功能的基础上，增加了企业微信 API 代理配置、QWRT 原生流量与在线检测、IP 归属地查询、设备事件合并推送及多项兼容性修复。
 
-自动封禁启用后，黑名单默认拦截访问路由器的流量；可另外开启“阻止黑名单 IP 的转发流量”，拦截经过路由器转发的所有流量（包括访问端口映射的下级设备、局域网客户端访问互联网）。开启转发封禁且已安装 conntrack 时，封禁还会尝试清理该 IP 的连接跟踪记录，以断开已有的流量卸载连接；未安装时跳过该步骤，新连接仍按黑名单规则拦截。关闭该选项或关闭自动封禁后，转发拦截规则会在下一次检测循环中被移除；与访问路由器的拦截规则一样，停止插件服务不会立即移除已生效的规则，它们会在防火墙重载或重启后消失，并在插件运行时于下一次检测循环中恢复。fw4 定时封禁按最近记录的剩余时长恢复。黑名单时间设置为 `0` 时永久封禁，手动清除黑名单后解除。
+当前软件包版本：**3.6.62-1**
 
-通知服务支持列表：
-| 推送应用 | 方式 | 接口说明 |
-| :-------- | :----- | :----- |
-| 微信 | Server酱 | https://sct.ftqq.com/
-| 微信 | 推送加 | http://www.pushplus.plus/
-| 微信等 | WPUSH | https://wpush.cn/
-| 微信 | WxPusher | https://wxpusher.zjiecode.com/docs
-| 企业微信 | 应用推送 | https://work.weixin.qq.com/api/doc/90000/90135/90248
-| Telegram | bot | https://t.me/BotFather
-| Mail | msmtp | https://marlam.de/msmtp/
+## 主要功能
 
-**企业微信 API 地址与正向代理：** 选择“企业微信图文消息”或“企业微信纯文字版”后，可在基础设置中填写“企业微信 API Base URL”。它是企业微信 API 的基础地址（例如 `https://api.example.com`），获取 Token、上传封面素材和发送消息都会使用该地址；留空时使用官方地址 `https://qyapi.weixin.qq.com`。如需通过 HTTP/SOCKS 正向代理访问该 API，可同时填写“Proxy Address”；该代理会应用于获取 Token、上传素材和发送消息的全部请求。两项配置相互独立：前者决定请求发往哪个 API 主机，后者决定网络连接经过哪个代理。若企业微信启用了可信 IP 白名单，还需在企业微信管理后台放行代理服务器的公网出口 IP。
+- **网络状态通知**：检测路由器 IPv4/IPv6 地址变化，并推送网络状态。
+- **终端设备监控**：检测局域网设备上线、离线，显示在线设备及相关信息；支持设备别名和 MAC 厂商信息。
+- **设备事件合并推送**：同一轮检测发现的多台设备状态变化会合并为一条通知，减少设备集中上下线时的消息数量。
+- **流量监控**：在支持的 QWRT 系统上读取原生累计流量，显示设备流量，并支持按每分钟流量增量触发异常流量告警。
+- **系统与主机监控**：监控路由器 CPU、温度及运行状态；可通过 SSH 获取远程主机（例如 PVE）的温度和磁盘信息。
+- **安全通知与防护**：Web/SSH 登录提醒、失败登录自动封禁、黑名单转发流量拦截，以及端口敲门。
+- **无人值守任务**：支持按设备在线状态、勿扰时段等条件执行配置的自动化任务。
+- **IP 归属地查询**：登录提醒可查询 IP 地理位置；IPv4 支持配置本地 ip2region XDB 数据库作为优先查询来源，未命中时回退在线查询。显示结果会进行层级归一化，不显示大洲、县区、运营商或 ASN。
+- **多种通知渠道**：支持 Server 酱、Server 酱 3、PushPlus、WPUSH、WxPusher、企业微信、Telegram Bot、msmtp 邮件，以及自定义 API 模板。
 
-精力有限，如需要钉钉推送、飞书推送、Bark 推送等请尝试另一个分支 https://github.com/zzsj0928/luci-app-pushbot ，或使用自定义 API 设置
+## 本仓库的主要扩展
 
-v2.06.2 之后的版本不再支持 LuCI 18.06，如需编译，请使用 openwrt-18.06 分支，拉取源码时请使用 `git clone -b openwrt-18.06 https://github.com/tty228/luci-app-wechatpush.git` 命令
+以下是相对于上游仓库的主要功能和维护改动，具体行为以当前源码为准：
 
-## 说明
+### 企业微信 API 与代理
 
-**关于安装：**
+- 可配置企业微信 API Base URL；留空时使用官方 API 地址。
+- 可配置 HTTP/SOCKS 正向代理，企业微信获取 Token、上传图文封面素材和发送消息均使用该代理。
+- API Base URL 与正向代理分别控制请求目标和网络出口，互不替代。
 
-插件依赖 iputils-arping + curl + jq + bash，对于内存有限的路由器，请酌情安装，**在安装之前，请先运行 `opkg update` 命令，以便在安装过程中安装依赖。**
+### QWRT 原生功能
 
-基于 X86 OpenWrt v23.05.0 制作，不同系统不同设备，可能会遇到各种问题，**如获取到错误的温度信息、页面显示错误、报错等，自行适配**
+仅适用于 **QWRT 2026.10.6 及以上版本**，在“基础设置”中分别启用：
 
-**关于主机名：**
+- **QWRT 原生流量统计**：使用 `luci.client-rates get` 获取累计流量，供在线设备信息、设备通知、异常流量告警及无人值守低流量判断使用。该实现不再依赖或调用旧版 `wrtbwmon`。
+- **QWRT 原生在线检测**：按 QWRT LuCI 概览使用的 ARP/MAC 规则判断设备在线状态，不发送 ping/arping 主动探测。该方式依赖当前 ARP 表，休眠设备或没有有效 ARP 记录的设备可能被判定为离线。
 
-对于设备未宣告主机名、光猫拨号上网、OpenWrt 作为旁路网关等各类情况导致的获取主机名失败，可以通过以下方式设置主机名
+两个 QWRT 选项相互独立，默认关闭。非 QWRT 系统不要启用。
 
-- 使用设备名备注
-- 在高级设置处配置从光猫、小米路由器、ROS 获取
-- 开启 MAC 设备数据库
-- 安装 samba*-server 或 samba*-client，使程序可以通过 NetBIOS 查询主机名
+### 离线检测参数与 MAC 名单
 
+高级设置中的离线超时和检测次数用于控制设备离线确认。另可在“MAC 过滤模式一”中启用“离线自定义检测列表”，指定哪些 MAC 地址使用自定义检测参数：
 
-**关于设备在线状态：**
+- “离线超时仅针对推送设备”关闭时，所有设备继续使用高级设置中的自定义超时和次数，新名单不改变这一行为。
+- 该选项开启、新名单开关关闭时，按本 fork 原有的推送过滤逻辑选择检测参数。
+- 两个开关均开启时，名单内 MAC 使用高级设置中的自定义超时和次数；名单外、空名单或无法获取 MAC 的设备使用 QWRT 默认值 **10 秒、2 次**。
+- 该名单只选择检测参数，不改变设备的推送资格；实际通知仍遵循原有通知开关和过滤规则。
 
-默认关闭“QWRT 原生在线检测”。关闭时沿用 wechatpush 原有主动检测流程：先按原有方式检查无线 station 状态，再根据 ARP 记录选择 `arping` 或 `ping`，并按配置进行检测；仅在 QWRT 2026.10.6 及以上版本中，才建议按需开启“QWRT 原生在线检测”。
+### 通知内容与设备信息
 
-开启“QWRT 原生在线检测”后，在线状态改为复用 QWRT LuCI 概览的 ARP/MAC 判定：读取 `/usr/libexec/luci-arp`（QWRT 默认输出 `/proc/net/arp`），只统计 `br-lan` 上具有有效 IPv4、有效单播 MAC 且 ARP 标志包含 `0x2` 的记录，再按 MAC 判断设备是否在线，不发送 ping/arping。设备状态默认每 5 秒轮询一次；如果配置的 `sleeptime` 小于 5 秒，则使用 `sleeptime`。网络检查、流量告警等常规任务仍按 `sleeptime` 执行。该方式依赖当前 ARP 表，休眠设备或 ARP 表中没有有效记录的设备可能被判定为离线。
+- 优化设备上下线通知标题和详情；同一轮检测中的设备状态变化合并推送。
+- 优化企业微信图文与纯文字消息的设备列表、流量字段及排版。
+- 支持本地 IPv4 ip2region XDB 查询，并对归属地结果进行规范化显示。
 
-**离线超时与检测次数：** 高级设置中的“设备离线检测超时”和“离线检测次数”共同决定离线确认条件。QWRT 原生检测下，首次检测失败计为第 1 次；必须同时达到设置的超时时间和失败检测总次数，设备才会转为离线。次数是失败检测总数，不是首次失败后还要额外重试的次数。达到次数但尚未到超时时间时，程序会等待到超时条件满足，不会额外增加一次探测。设备在确认离线前，只要后续某次轮询重新出现在在线 ARP 集合中，就会恢复为在线并清除本次待确认计数，不产生本次离线通知。例如设置为 15 秒、3 次时，首次失败计为第 1 次，后续检测按超时窗口安排；只有经过至少 15 秒且累计 3 次失败，才确认离线。由于轮询间隔为 5 秒，实际检查时刻可能有少量偏差。
+## 安装与依赖
 
-**按 MAC 指定离线检测参数：** 在“MAC 过滤模式一”区域增加“离线自定义检测列表”开关及其下方的“离线检测列表”：
-- “离线超时仅针对推送设备”未勾选时，所有设备均使用高级设置中的自定义检测超时和次数，新名单不改变这一原有行为。
-- “离线超时仅针对推送设备”已勾选、但“离线自定义检测列表”未启用时，严格按 fork 原有的推送过滤判定选择检测参数。
-- 两个选项均启用时，只有“离线检测列表”中 MAC 命中的设备使用高级设置中的自定义超时和次数；列表外设备、空列表以及无法获取 MAC 的设备均使用 QWRT 默认检测参数 10 秒、2 次。
-- 离线检测名单只决定检测参数，不参与 blackwhitelist 推送过滤，不会因为设备未列入名单或没有 MAC 而剔除设备的推送资格；实际推送仍遵循原有通知开关和过滤设置。
+软件包架构为 `all`。安装时由 OpenWrt 软件包管理器处理依赖。基础依赖：
 
-- 如遇设备休眠频繁，请结合设备情况调整离线超时和检测次数。
-- 如果不需要精准的设备在线信息，只需要其余功能，可以在高级设置中关闭主动探测。
-- QWRT 原生在线检测默认关闭，非 QWRT 系统请勿开启。
+- `iputils-arping`
+- `curl`
+- `jq`
+- `bash`
+- `lua`
+- `luci-lua-runtime`
 
-**关于流量统计信息：**
+使用本仓库 GitHub Actions 构建产物时，下载对应的软件包后安装，例如：
 
-插件已移除旧版 `wrtbwmon` 统计、数据库读取和每日清零逻辑，不再检测或调用 `wrtbwmon`。QWRT 2026.10.6 及以上版本可在“基础设置”开启“QWRT 原生流量统计”，在线设备页面、设备推送、异常流量告警和无人值守低流量判断均使用 QWRT 原生累计流量。异常流量告警按每分钟累计流量增量与配置阈值比较，并显示上传、下载增量；在线设备列表按客户端名、IP 地址、在线时间、流量的顺序展示，在线时间使用补零格式。图文版与纯文字版的在线设备列表均根据表头和当前内容的 UTF-8 显示宽度动态计算各列宽度，名称较长时按各模板原有规则截断；图文版使用 HTML 表格进行实际列布局，客户端名/IP、IP/在线时间、在线时间/流量各列之间增加两个 `&nbsp;` 占位空白；纯文字版按需使用全角和半角空格，尽量保持各列对齐。设备连接和断开事件按一轮完整检测结果合并为一条推送，单台设备标题显示设备名、IP 和状态，多台设备标题显示变更台数，正文逐台列出状态和详情，设备事件批次不受“仅推送标题”简化选项影响。新上线、离线设备详情在图文版中使用表格统一标签/内容列，其他模板仍按字段标签宽度补齐。企业微信图文消息使用箭头显示上传/下载流量，纯文字消息使用 `msgtype=text`，仅显示下载流量。关闭“QWRT 原生在线检测”时，完全使用 wechatpush 原来的 `getping()` 判断逻辑，不增加此前版本引入的无线关联缓存、`REACHABLE` 邻居表捷径或短超时探测改动。开启后复用 QWRT 概览的同一套 ARP/MAC 规则：读取 `/usr/libexec/luci-arp`（QWRT 默认输出 `/proc/net/arp`），只将 `br-lan` 上 ARP 标志包含 `0x2`、IPv4 有效且 MAC 为有效单播地址的记录计入在线集合，再按 MAC 判断在线状态；不发送 ping/arping。启用时设备状态每 5 秒轮询一次（若 `sleeptime` 小于 5 秒则按 `sleeptime`），已离线设备本轮直接转为 `offline` 并进入推送，不再等待原有 `unknown` 二次确认；网络检查、流量告警等常规任务仍按 `sleeptime` 执行。关闭时保持原有扫描间隔和完整的二次确认流程。由于此方式依赖当前 ARP 表，休眠设备或 ARP 表没有有效记录的设备可能显示离线。两个 QWRT 开关彼此独立。该选项默认关闭，非 QWRT 系统请勿开启。数据通过 `luci.client-rates get` 获取，按 IPv4 设备地址关联 MAC，流量单位按 1024 进制自动显示为 KB、MB 或 GB。
+```sh
+opkg install ./luci-app-wechatpush_3.6.62-1_all.ipk
+```
 
-**关于硬盘信息：**
+可选依赖：
 
-当 OpenWrt 系统或远程主机（PVE）未安装 lsblk 时，硬盘容量信息可能与实际不一致
+- **本地/远程磁盘信息**：`lsblk`、`smartmontools`、`smartmontools-drivedb`。
+- **远程主机信息**：`openssh-client`、`openssh-keygen`，并提前配置 SSH 密钥登录。
+- **邮件通知**：安装并配置 `msmtp`；也可在插件的邮件配置项中填写 SMTP 参数。
 
-当 OpenWrt 系统或远程主机（PVE）未安装 smartctl 时，硬盘温度、通电时间、健康度等信息不可用
+本仓库当前 GitHub Actions 工作流分别使用 OpenWrt 23.05.3 SDK 构建 IPK、OpenWrt 25.12.0-rc1 SDK 构建 APK，构建目标为 x86/64。软件包本身为架构无关包，但上述 CI 产物不代表已提供 QWRT ipq53xx/aarch64 专用构建；其他目标平台请使用对应 SDK 自行编译。
 
-**关于 bug 提交：**
+## 使用说明
 
-提交 bug 时请尽量带上以下信息
+- 首次安装或升级前，可先执行 `opkg update` 更新软件包索引。
+- 在 LuCI 的“服务 / 微信推送”页面选择通知方式并填写对应凭据，再启用服务。
+- 使用企业微信时，可信 IP 白名单仍由企业微信管理后台控制；如配置正向代理，应放行代理服务器的公网出口 IP。
+- 启用 QWRT 原生流量或在线检测前，请确认设备运行的是 QWRT 2026.10.6 或更新版本。
+- 本地 ip2region 数据库需自行准备有效的 IPv4 XDB 文件，并在基础设置中填写实际路径。
 
-- 设备信息及插件版本号
-- 执行 `/usr/share/wechatpush/wechatpush` 后的提示信息
-- 报错后的日志信息、`/tmp/wechatpush/` 目录下的文件信息
-- `bash -x /usr/share/wechatpush/wechatpush t1` 的详细运行信息
+## 故障排查
 
+提交问题时请附上设备型号、系统版本、软件包版本，以及相关日志。可在路由器上执行：
 
-## 下载
+```sh
+/usr/share/wechatpush/wechatpush
+bash -x /usr/share/wechatpush/wechatpush t1
+```
 
-| 支持的 OpenWrt 版本 | 下载地址 |
-| :-------- | :----- |
-| openwrt-19.07.0 ... latest | [![Lastest Release](https://img.shields.io/github/release/tty228/luci-app-wechatpush.svg?style=flat)](https://github.com/tty228/luci-app-wechatpush/releases)
-| openwrt-18.06 | [![Release v2.06.2](https://img.shields.io/badge/release-v2.06.2-lightgrey.svg)](https://github.com/tty228/luci-app-wechatpush/releases/tag/v2.06.2)
+同时提供 `/tmp/wechatpush/` 中与问题相关的日志或调试文件。请勿在公开 issue 中粘贴企业微信 Secret、Bot Token、邮箱密码等敏感凭据。
 
+## 项目地址
 
-## 捐赠
+- 本仓库：<https://github.com/jarod360/luci-app-wechatpush>
+- 上游项目：<https://github.com/tty228/luci-app-wechatpush>
 
-如果你觉得此项目对你有帮助，请捐助我们，使项目能持续发展和更加完善。
-
-![image](https://github.com/tty228/luci-app-wechatpush/blob/master/.github/others/20260303202537_34_664.png)
+本项目遵循 GPL-2.0 许可证。
