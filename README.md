@@ -1,16 +1,16 @@
 # luci-app-wechatpush
 
 [![Build](https://github.com/jarod360/luci-app-wechatpush/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/jarod360/luci-app-wechatpush/actions/workflows/build.yml)
-![Version](https://img.shields.io/badge/version-3.6.64-blue)
+![Version](https://img.shields.io/badge/version-3.6.19-blue)
 [![License](https://img.shields.io/badge/license-GPL--2.0-blue.svg)](LICENSE)
 
 [简体中文](README.md) | [English](README_en.md)
 
 ## 项目简介
 
-**luci-app-wechatpush** 是一个 OpenWrt LuCI 网络监控与消息通知插件。本仓库是基于上游 [tty228/luci-app-wechatpush](https://github.com/tty228/luci-app-wechatpush) 持续维护的 fork，在保留原有通知和监控功能的基础上，增加了企业微信 API 代理配置、QWRT 原生流量与在线检测、IP 归属地查询、设备事件合并推送及多项兼容性修复。
+**luci-app-wechatpush** 是一个 OpenWrt LuCI 网络监控与消息通知插件。本仓库是基于上游 [tty228/luci-app-wechatpush](https://github.com/tty228/luci-app-wechatpush) 持续维护的 fork，在保留原有通知、监控及 HTTP/SOCKS 正向代理等 fork 功能的基础上，进一步扩展了 QWRT 原生流量与在线检测、IP 归属地查询、设备事件合并推送及多项兼容性修复。
 
-当前软件包版本：**3.6.64-1**
+当前软件包版本：**3.6.19-1**
 
 ## 主要功能
 
@@ -21,18 +21,25 @@
 - **系统与主机监控**：监控路由器 CPU、温度及运行状态；可通过 SSH 获取远程主机（例如 PVE）的温度和磁盘信息。
 - **安全通知与防护**：Web/SSH 登录提醒、失败登录自动封禁、黑名单转发流量拦截，以及端口敲门。
 - **无人值守任务**：支持按设备在线状态、勿扰时段等条件执行配置的自动化任务。
-- **IP 归属地查询**：登录提醒可查询 IP 地理位置；IPv4 支持配置本地 ip2region XDB 数据库作为优先查询来源，未命中时回退在线查询。显示结果会进行层级归一化，不显示大洲、县区、运营商或 ASN。
 - **多种通知渠道**：支持 Server 酱、Server 酱 3、PushPlus、WPUSH、WxPusher、企业微信、Telegram Bot、msmtp 邮件，以及自定义 API 模板。
+
+## 保留的原有 fork 功能
+
+- **企业微信 HTTP/SOCKS 正向代理**：可配置 HTTP/SOCKS 正向代理，企业微信获取 Token、上传图文封面素材和发送消息均使用该代理。这是原有 fork 已具备的功能，并非本次新增扩展。
 
 ## 本仓库的主要扩展
 
-以下是相对于上游仓库的主要功能和维护改动，具体行为以当前源码为准：
+以下是相对于上游仓库的主要扩展和维护改动，具体行为以当前源码为准：
 
-### 企业微信 API 与代理
+### IP 归属地查询扩展
+
+- 登录提醒可查询 IP 地理位置。
+- IPv4 支持配置本地 ip2region XDB 数据库作为优先查询来源，未命中时回退在线查询。
+- 显示结果会进行层级归一化，不显示大洲、县区、运营商或 ASN。
+
+### 企业微信 API 地址配置
 
 - 可配置企业微信 API Base URL；留空时使用官方 API 地址。
-- 可配置 HTTP/SOCKS 正向代理，企业微信获取 Token、上传图文封面素材和发送消息均使用该代理。
-- API Base URL 与正向代理分别控制请求目标和网络出口，互不替代。
 
 ### QWRT 原生功能
 
@@ -72,7 +79,7 @@
 使用本仓库 GitHub Actions 构建产物时，下载对应的软件包后安装，例如：
 
 ```sh
-opkg install ./luci-app-wechatpush_3.6.64-1_all.ipk
+opkg install ./luci-app-wechatpush_3.6.19-1_all.ipk
 ```
 
 可选依赖：
