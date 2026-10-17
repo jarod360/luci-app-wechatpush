@@ -47,7 +47,7 @@ Both QWRT options are independent and disabled by default. Do not enable them on
 
 The offline timeout and detection count in Advanced Settings control offline confirmation. A new “Offline custom detection” mode is available in “MAC Filtering Mode 1”. Selecting it reveals the “Offline detection list” MAC selector:
 
-- When “Offline timeout applies only to the devices that receive push notifications” is disabled, all devices continue to use the custom timeout and count; the new list does not change this behavior.
+- When “Offline timeout applies only to the devices that receive push notifications” is disabled, all devices in the original modes continue to use the custom timeout and count. Selecting the new “Offline custom detection” mode instead applies the MAC-list-based detection parameters.
 - Selecting any of the original modes (including “Close”) preserves this fork's original detection-parameter selection and push-filter behavior.
 - When “Offline custom detection” is selected, MAC addresses in the list use the custom timeout and count. Devices outside the list, an empty list, or devices whose MAC cannot be obtained use the default detection parameters of **10 seconds and 2 checks**.
 - The list selects detection parameters only. It does not change push eligibility; actual notifications remain subject to the existing notification switches and filters.
