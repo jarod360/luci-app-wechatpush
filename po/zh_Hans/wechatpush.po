@@ -1678,6 +1678,3 @@ msgstr "此列表里的设备使用自定义检测，其他设备使用默认检
 
 msgid "Offline custom detection list"
 msgstr "离线自定义检测列表"
-
-msgid "Devices in this list use the custom offline detection timeout and count. Other devices use the default detection logic. Enabling this list does not affect push notifications for any device."
-msgstr "列表中的设备使用自定义检测超时和次数，其他设备使用模式默认检测逻辑。启用此名单不影响所有设备推送。"
