@@ -1657,18 +1657,6 @@ msgstr "上传 / 下载"
 
 
 
-msgid "Offline custom detection list"
-msgstr "离线自定义检测列表"
-
-msgid "When enabled, devices in the Offline detection list use custom detection; all other devices use the default detection logic."
-msgstr "启用后，离线检测列表中的设备使用自定义检测，其他设备使用默认检测。"
-
-msgid "Offline detection list"
-msgstr "离线检测列表"
-
-msgid "Devices in this list use the custom offline detection timeout and count. Other devices use the default detection logic. Enabling this list does not change push eligibility; all devices remain subject to the existing push notification settings."
-msgstr "列表中的设备使用自定义检测超时和次数，其他设备使用模式默认检测逻辑。启用此名单不影响设备推送资格，所有设备仍按原有推送设置处理。"
-
 msgid "Offline custom detection"
 msgstr "离线自定义检测"
 
