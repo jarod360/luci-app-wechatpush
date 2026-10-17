@@ -8,7 +8,7 @@
 
 ## 项目简介
 
-**luci-app-wechatpush** 是一个 OpenWrt LuCI 网络监控与消息通知插件。本仓库是基于上游 [tty228/luci-app-wechatpush](https://github.com/tty228/luci-app-wechatpush) 持续维护的 fork，在保留原有通知、监控及 HTTP/SOCKS 正向代理等 fork 功能的基础上，进一步扩展了 QWRT 原生流量与在线检测、IP 归属地查询、设备事件合并推送及多项兼容性修复。
+**luci-app-wechatpush** 是一个 OpenWrt LuCI 网络监控与消息通知插件。本仓库是基于上游 [tty228/luci-app-wechatpush](https://github.com/tty228/luci-app-wechatpush) 持续维护的 fork，在保留原有通知和监控功能的基础上，进一步扩展了 QWRT 原生流量与在线检测、IP 归属地查询、设备事件合并推送及多项兼容性修复。
 
 当前软件包版本：**3.6.19-1**
 
@@ -22,10 +22,6 @@
 - **安全通知与防护**：Web/SSH 登录提醒、失败登录自动封禁、黑名单转发流量拦截，以及端口敲门。
 - **无人值守任务**：支持按设备在线状态、勿扰时段等条件执行配置的自动化任务。
 - **多种通知渠道**：支持 Server 酱、Server 酱 3、PushPlus、WPUSH、WxPusher、企业微信、Telegram Bot、msmtp 邮件，以及自定义 API 模板。
-
-## 保留的原有 fork 功能
-
-- **企业微信 HTTP/SOCKS 正向代理**：可配置 HTTP/SOCKS 正向代理，企业微信获取 Token、上传图文封面素材和发送消息均使用该代理。这是原有 fork 已具备的功能，并非本次新增扩展。
 
 ## 本仓库的主要扩展
 
