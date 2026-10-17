@@ -1,7 +1,7 @@
 # luci-app-wechatpush
 
 [![Build](https://github.com/jarod360/luci-app-wechatpush/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/jarod360/luci-app-wechatpush/actions/workflows/build.yml)
-![Version](https://img.shields.io/badge/version-3.6.62-blue)
+![Version](https://img.shields.io/badge/version-3.6.63-blue)
 [![License](https://img.shields.io/badge/license-GPL--2.0-blue.svg)](LICENSE)
 
 [简体中文](README.md) | [English](README_en.md)
@@ -10,7 +10,7 @@
 
 **luci-app-wechatpush** 是一个 OpenWrt LuCI 网络监控与消息通知插件。本仓库是基于上游 [tty228/luci-app-wechatpush](https://github.com/tty228/luci-app-wechatpush) 持续维护的 fork，在保留原有通知和监控功能的基础上，增加了企业微信 API 代理配置、QWRT 原生流量与在线检测、IP 归属地查询、设备事件合并推送及多项兼容性修复。
 
-当前软件包版本：**3.6.62-1**
+当前软件包版本：**3.6.63-1**
 
 ## 主要功能
 
@@ -72,7 +72,7 @@
 使用本仓库 GitHub Actions 构建产物时，下载对应的软件包后安装，例如：
 
 ```sh
-opkg install ./luci-app-wechatpush_3.6.62-1_all.ipk
+opkg install ./luci-app-wechatpush_3.6.63-1_all.ipk
 ```
 
 可选依赖：
