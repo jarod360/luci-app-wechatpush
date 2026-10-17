@@ -1660,8 +1660,8 @@ msgstr "上传 / 下载"
 msgid "Offline custom detection"
 msgstr "离线自定义检测"
 
-msgid "Devices in the Offline detection list use custom timeout and detection count; all other devices use the default detection logic. Push eligibility is unchanged."
-msgstr "离线检测列表中的设备使用自定义检测超时和次数，其他设备使用默认检测逻辑。设备推送资格保持不变。"
+msgid "Devices in this list use custom detection; all other devices use the default detection logic. Push eligibility is unchanged."
+msgstr "此列表设备使用自定义检测，其他设备使用默认检测。设备推送资格保持不变。"
 
 msgid "This list only changes detection parameters and does not affect push notifications."
 msgstr "此名单仅调整检测参数，不影响设备推送。"
