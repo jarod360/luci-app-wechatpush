@@ -159,7 +159,7 @@ return view.extend({
 		o = s.option(form.Flag, "only_timeout_push", _("Offline timeout applies only to the devices that receive push notifications"))
 		o.default = 0
 		o.rmempty = true
-		o.description = _("When this option is active, the original push-notification filter determines which devices use the custom offline timeout and detection count; other devices use the default values. The offline custom detection MAC list in MAC Filtering Mode 1 only restores the custom timeout and count for matching devices that the original filter excludes. It does not change push-notification filtering, and it has no effect unless this original option is active.")
+		o.description = _("When disabled, all devices use the custom timeout and detection count. When enabled, the original push filter determines which devices use custom settings, unless the Offline custom detection list is enabled in MAC Filtering Mode 1; then only devices in that list use custom settings and all others use the default values (10 seconds and 2 checks). The list changes detection parameters only and never changes push eligibility.")
 		o.depends('passive_mode', '0');
 
 		o = s.option(form.DynamicList, 'always_check_ip_list', _('IP address to always scan'));
