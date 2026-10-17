@@ -2290,7 +2290,7 @@ down() {
 	# 保留原有 only_timeout_push + blackwhitelist 判定，只为原本不符合推送条件的设备增加 MAC 例外名单。
 	local tmp_timeout="$down_timeout"
 	local tmp_retry_count="$timeout_retry_count"
-	if [ -n "$only_timeout_push" ]; then
+	if [ "$only_timeout_push" = "1" ]; then
 		blackwhitelist "$mac"
 		local ip_blackwhite=$?
 		if [ "$ip_blackwhite" -ne 0 ]; then
