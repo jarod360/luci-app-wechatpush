@@ -1,7 +1,7 @@
 # luci-app-wechatpush
 
 [![Build](https://github.com/jarod360/luci-app-wechatpush/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/jarod360/luci-app-wechatpush/actions/workflows/build.yml)
-![Version](https://img.shields.io/badge/version-3.6.63-blue)
+![Version](https://img.shields.io/badge/version-3.6.64-blue)
 [![License](https://img.shields.io/badge/license-GPL--2.0-blue.svg)](LICENSE)
 
 [简体中文](README.md) | [English](README_en.md)
@@ -10,7 +10,7 @@
 
 **luci-app-wechatpush** 是一个 OpenWrt LuCI 网络监控与消息通知插件。本仓库是基于上游 [tty228/luci-app-wechatpush](https://github.com/tty228/luci-app-wechatpush) 持续维护的 fork，在保留原有通知和监控功能的基础上，增加了企业微信 API 代理配置、QWRT 原生流量与在线检测、IP 归属地查询、设备事件合并推送及多项兼容性修复。
 
-当前软件包版本：**3.6.63-1**
+当前软件包版本：**3.6.64-1**
 
 ## 主要功能
 
@@ -45,11 +45,11 @@
 
 ### 离线检测参数与 MAC 名单
 
-高级设置中的离线超时和检测次数用于控制设备离线确认。在“MAC 过滤模式一”中新增“离线自定义检测”模式；选择该模式后，下方显示“离线检测列表” MAC 选择框：
+高级设置中的离线超时和检测次数用于控制设备离线确认。在“MAC 过滤模式一”中新增“离线自定义检测设备”模式；选择该模式后，下方显示“离线自定义检测列表” MAC 选择框：
 
-- “离线超时仅针对推送设备”关闭时，原有模式仍由所有设备使用自定义超时和次数；但如果选择了新增的“离线自定义检测”模式，则按该模式的 MAC 名单选择检测参数。
+- “离线超时仅针对推送设备”关闭时，原有模式仍由所有设备使用自定义超时和次数；但如果选择了新增的“离线自定义检测设备”模式，则按该模式的 MAC 名单选择检测参数。
 - 选择其他原有模式（包括“关闭”）时，完全沿用本 fork 原有的检测参数选择和推送过滤逻辑。
-- 选择“离线自定义检测”模式后，名单内 MAC 使用高级设置中的自定义超时和次数；名单外、空名单或无法获取 MAC 的设备使用默认检测参数 **10 秒、2 次**。
+- 选择“离线自定义检测设备”模式后，名单内 MAC 使用高级设置中的自定义超时和次数；名单外、空名单或无法获取 MAC 的设备使用默认检测参数 **10 秒、2 次**。
 - 该名单只选择检测参数，不改变设备的推送资格；实际通知仍遵循原有通知开关和过滤规则。
 
 ### 通知内容与设备信息
@@ -72,7 +72,7 @@
 使用本仓库 GitHub Actions 构建产物时，下载对应的软件包后安装，例如：
 
 ```sh
-opkg install ./luci-app-wechatpush_3.6.63-1_all.ipk
+opkg install ./luci-app-wechatpush_3.6.64-1_all.ipk
 ```
 
 可选依赖：
