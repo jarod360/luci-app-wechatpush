@@ -723,6 +723,9 @@ return view.extend({
 		o.depends('do_not_disturb_mode', '2');
 
 		o = s.taboption('disturb', cbiRichListValue, 'mac_filtering_mode_1', _('MAC Filtering Mode 1'));
+		o.value('offline_custom', _('Offline custom detection devices'),
+			_('Devices in this list use custom detection; all other devices use the default detection.'));
+
 		o.value('', _('Close'),
 			_(' '));
 		o.value('allow', _('Ignore devices in the list'),
@@ -732,10 +735,7 @@ return view.extend({
 		o.value('interface', _('Notify only devices using this interface'),
 			_('Multiple selections are not supported at the moment'));
 
-		o.value('offline_custom', _('Offline custom detection'),
-			_('Devices in this list use custom detection; all other devices use the default detection logic. Push eligibility is unchanged.'));
-
-		o = fwtool.addMACOption(s, 'disturb', 'offline_detection_mac_list', _('Offline detection list'),
+		o = fwtool.addMACOption(s, 'disturb', 'offline_detection_mac_list', _('Offline custom detection list'),
 			_('Please select device MAC'), hosts);
 		o.datatype = 'list(neg(macaddr))';
 		o.rmempty = true;
