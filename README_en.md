@@ -1,101 +1,110 @@
-# Introduction
+# luci-app-wechatpush
 
-[![Lastest Release](https://img.shields.io/github/release/tty228/luci-app-wechatpush.svg?style=flat)](https://github.com/tty228/luci-app-wechatpush/releases)
-[![GitHub All Releases](https://img.shields.io/github/downloads/tty228/luci-app-wechatpush/total)](https://github.com/tty228/luci-app-wechatpush/releases)
+[![Build](https://github.com/jarod360/luci-app-wechatpush/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/jarod360/luci-app-wechatpush/actions/workflows/build.yml)
+![Version](https://img.shields.io/badge/version-3.6.62-blue)
+[![License](https://img.shields.io/badge/license-GPL--2.0-blue.svg)](LICENSE)
 
-[中文文档](README.md) | [English](README_en.md)
+[简体中文](README.md) | [English](README_en.md)
 
-**OpenWrt Notification Plugin – Send Alerts to WeChat or Telegram**
+## Overview
 
-This OpenWrt plugin delivers real-time router notifications to your mobile device via **WeChat** or **Telegram** or **Mail**. Monitor your network with alerts for:
+**luci-app-wechatpush** is an OpenWrt LuCI plugin for network monitoring and notifications. This repository is a maintained fork of [tty228/luci-app-wechatpush](https://github.com/tty228/luci-app-wechatpush). It retains the upstream notification and monitoring functions while adding configurable WeCom API routing, QWRT-native traffic and online detection, IP geolocation lookup, batched device-event notifications, and compatibility fixes.
 
-- [x] IP changes (IPv4/IPv6)
-- [x] Device connections (online/offline)
-- [x] Online client list & traffic usage
-- [x] CPU load & temperature (including virtualized hosts like PVE)
-- [x] Router status reports
-- [x] Security alerts (failed web/SSH logins with auto blacklist)
-- [x] Port knocking & automated tasks
+Current package version: **3.6.62-1**
 
-Auto-banning blocks blacklisted IPs from accessing the router. Optionally block all forwarded traffic from blacklisted IPs, including access to port-forwarded downstream devices and Internet access by LAN clients. With forwarded-traffic blocking enabled and conntrack installed, banning also attempts to clear that IP's existing connection-tracking entries to interrupt offloaded flows; without conntrack, this step is skipped while new connections remain blocked by the blacklist rules. Turning the option off, or turning auto-ban off, removes the forwarded-traffic drop rules on the next detection cycle; like the router-access drop rules, they are not removed by stopping the service, disappear after a firewall reload or reboot, and are restored on the plugin's next detection cycle while it runs. fw4 timed bans are restored with their last recorded remaining duration. Set the blacklist duration to `0` for permanent bans; remove the IP from the blacklist to lift the ban.
+## Features
 
-Supported services:
-| Push application | Method | description |
-| :-------- | :----- | :----- |
-| WeChat | Server Chan | https://sct.ftqq.com/
-| WeChat | PushPlus | http://www.pushplus.plus/
-| WeChat etc. | WPUSH | https://wpush.cn/
-| WeChat | WxPusher | https://wxpusher.zjiecode.com/docs
-| WeChat for Enterprise | Application Push | https://work.weixin.qq.com/api/doc/90000/90135/90248
-| Telegram | bot | https://t.me/BotFather
-| Mail | msmtp | https://marlam.de/msmtp/
+- **Network notifications**: Detect IPv4/IPv6 address changes and report network status.
+- **Client monitoring**: Track LAN device online/offline status and display connected clients; supports device aliases and MAC vendor information.
+- **Batched device events**: Combine device state changes found during one detection cycle into a single notification.
+- **Traffic monitoring**: On supported QWRT systems, read native cumulative traffic and trigger abnormal-traffic alerts based on per-minute traffic increments.
+- **System and host monitoring**: Monitor router CPU, temperature, and runtime status; retrieve temperature and disk information from remote hosts such as PVE over SSH.
+- **Security notifications and protection**: Web/SSH login alerts, automatic banning after failed logins, optional blocking of forwarded traffic from blacklisted IPs, and port knocking.
+- **Unattended tasks**: Run configured automation based on device presence, Do-Not-Disturb periods, and other conditions.
+- **IP geolocation**: Look up locations for login alerts. IPv4 can use a configured local ip2region XDB database first, with online lookup as fallback. Results are normalized without continent, district/county, ISP, or ASN details.
+- **Notification providers**: Server Chan, Server Chan 3, PushPlus, WPUSH, WxPusher, WeCom, Telegram Bot, msmtp email, and custom API templates.
 
-Limited resources are available. If you need services such as DingTalk push, Feishu push, Bark push, etc., please try another branch at https://github.com/zzsj0928/luci-app-pushbot, or use **custom API settings**.
+## Main fork-specific changes
 
-## Instructions
+The following summarizes the major additions and maintenance changes compared with the upstream repository. Exact behavior is defined by the current source code.
 
-**Regarding Installation:**
+### WeCom API and proxy
 
-The plugin requires dependencies on iputils-arping + curl + jq + bash. For routers with limited memory, please consider the installation carefully. **Before installing, please run the opkg update command to install dependencies during the installation process.**
+- Configure a custom WeCom API Base URL; when empty, the official API endpoint is used.
+- Configure an HTTP/SOCKS forward proxy. WeCom token retrieval, media upload for image messages, and message sending all use the configured proxy.
+- The API Base URL selects the destination host, while the proxy selects the network route; they are independent settings.
 
-Developed based on X86 OpenWrt v23.05.0, different systems and devices may encounter various issues. **If you encounter errors in temperature information retrieval, display errors, or other issues, please adapt accordingly.**
+### QWRT-native features
 
-**Regarding Hostnames:**
+These options require **QWRT 2026.10.6 or later** and are enabled separately under Basic Settings:
 
-For devices that do not declare hostnames, devices connected via optical modem dial-up, OpenWrt used as a bypass gateway, and other scenarios where hostname retrieval fails, you can set the hostname using the following methods:
+- **QWRT native traffic statistics**: Reads cumulative traffic through `luci.client-rates get`. The data is used for online-device information, device notifications, abnormal-traffic alerts, and unattended low-traffic checks. This implementation no longer depends on or calls the legacy `wrtbwmon`.
+- **QWRT native online detection**: Determines client state using the ARP/MAC rules used by the QWRT LuCI overview. It does not send active ping/arping probes. Because it relies on the current ARP table, sleeping clients or clients without a valid ARP entry may be reported offline.
 
-- Use device name remarks.
-- Configure to obtain the hostname from the optical modem in advanced settings.
-- Enable MAC device database.
-- Install samba*-server or samba*-client to enable the program to query hostnames via NetBIOS.
+Both QWRT options are independent and disabled by default. Do not enable them on non-QWRT systems.
 
+### Offline detection parameters and MAC list
 
-**Regarding Device Online Status:**
+The offline timeout and detection count in Advanced Settings control offline confirmation. The “Offline custom detection list” in “MAC Filtering Mode 1” can select which MAC addresses use those custom parameters:
 
-“QWRT native online detection” is disabled by default. When disabled, the plugin retains its original active-detection flow: it checks the wireless station state, then uses the existing ARP information to choose `arping` or `ping`, applying the configured detection parameters. Enable this option only when using QWRT 2026.10.6 or later.
+- When “Offline timeout applies only to the devices that receive push notifications” is disabled, all devices continue to use the custom timeout and count; the new list does not change this behavior.
+- When that option is enabled but the new list switch is disabled, parameter selection follows this fork's original push-filter logic.
+- When both switches are enabled, MAC addresses in the list use the custom timeout and count. Devices outside the list, an empty list, or devices whose MAC cannot be obtained use the QWRT defaults of **10 seconds and 2 checks**.
+- The list selects detection parameters only. It does not change push eligibility; actual notifications remain subject to the existing notification switches and filters.
 
-When enabled, online status is determined using the same ARP/MAC rules as the QWRT LuCI overview. The plugin reads `/usr/libexec/luci-arp` (which outputs `/proc/net/arp` by default on QWRT), counts only valid unicast MAC records with valid IPv4 addresses on `br-lan` whose ARP flags include `0x2`, and determines device status by MAC address. It does not send ping/arping probes. Device status is polled every 5 seconds by default; if `sleeptime` is configured below 5 seconds, that shorter interval is used. Routine tasks such as network checks and traffic alerts continue to follow `sleeptime`. Because this method depends on the current ARP table, sleeping devices or devices without a valid ARP entry may be reported offline.
+### Notification content and client information
 
-**Offline timeout and detection count:** The “Device offline detection timeout” and “Offline detection count” settings in Advanced determine the offline confirmation conditions together. With QWRT native detection, the first failed check counts as failure number 1. A device is marked offline only after both the configured timeout has elapsed and the configured total number of failed checks has been reached. The count is the total number of failed checks, not the number of additional retries after the first failure. If the count is reached before the timeout, the plugin waits for the timeout condition rather than performing an extra probe. If a later poll finds the device online again before offline confirmation, its status returns to online and the pending failure counters are cleared; no offline event is generated for that pending outage. For example, with a timeout of 15 seconds and a count of 3, the first failure is count 1; offline is confirmed only after at least 15 seconds and 3 failed checks. Actual check times may vary slightly with the 5-second polling interval.
+- Improve device online/offline notification titles and details, and batch state changes detected in the same scan cycle.
+- Improve client lists, traffic fields, and layout in WeCom image and plain-text messages.
+- Support local IPv4 ip2region XDB lookup and normalized geolocation output.
 
-**MAC-based custom offline detection:** The “MAC Filtering Mode 1” area contains an “Offline custom detection list” switch and an “Offline detection list” below it:
-- When “Offline timeout applies only to the devices that receive push notifications” is disabled, all devices use the custom timeout and detection count in Advanced settings, preserving the existing behavior; the new list does not change it.
-- When that original option is enabled but the new list switch is disabled, detection parameters are selected strictly according to the fork's original push-filter logic.
-- When both switches are enabled, only devices whose MAC addresses appear in the Offline detection list use the custom timeout and count from Advanced settings. Devices outside the list, an empty list, and devices whose MAC address cannot be obtained use the QWRT default detection values of 10 seconds and 2 checks.
-- The offline detection list only selects detection parameters. It is not used by blackwhitelist() and does not remove push eligibility for devices outside the list or devices without a MAC address. Actual notifications remain subject to the existing notification switches and filters.
+## Installation and dependencies
 
-- If devices frequently sleep, adjust the offline timeout and detection count according to the device behavior.
-- If precise online status is not required, you can disable active detection in Advanced settings.
-- QWRT native online detection is disabled by default; do not enable it on non-QWRT systems.
+The package architecture is `all`. OpenWrt's package manager resolves the required dependencies:
 
-**Regarding Traffic Statistics:**
+- `iputils-arping`
+- `curl`
+- `jq`
+- `bash`
+- `lua`
+- `luci-lua-runtime`
 
-Traffic statistics functionality depends on `wrtbwmon`. Please install or compile it yourself. **Enabling this plugin will conflict with Routing/NAT, Flow Offloading, proxy internet access, and other plugins, resulting in the inability to obtain traffic statistics. Please choose accordingly.**
+To install a package built by this repository's GitHub Actions, download the matching artifact and run, for example:
 
-**About Hard Drive Information:**
+```sh
+opkg install ./luci-app-wechatpush_3.6.62-1_all.ipk
+```
 
-When the OpenWrt system or remote host (PVE) does not have lsblk installed, the hard drive capacity information may be inconsistent with the actual capacity.
+Optional dependencies:
 
-When the OpenWrt system or remote host (PVE) does not have smartctl installed, information such as hard drive temperature, uptime, and health status will not be available.
+- **Local/remote disk information**: `lsblk`, `smartmontools`, and `smartmontools-drivedb`.
+- **Remote host information**: `openssh-client` and `openssh-keygen`; configure SSH key-based login first.
+- **Email notifications**: Install and configure `msmtp`, or enter SMTP settings in the plugin's mail configuration.
 
-**Regarding Bug Submissions:**
+The current GitHub Actions workflow builds an IPK with the OpenWrt 23.05.3 SDK and an APK with the OpenWrt 25.12.0-rc1 SDK. Both CI jobs target x86/64. Although the package itself is architecture-independent, these CI artifacts are not dedicated QWRT ipq53xx/aarch64 builds; use the appropriate SDK to build for other targets.
 
-When submitting a bug, please provide the following information if possible:
+## Usage notes
 
-- Device information and plugin version number.
-- Prompt information after executing `/usr/share/wechatpush/wechatpush`.
-- Log information and file information in the `/tmp/wechatpush/` directory after encountering an error.
-- Detailed execution information of `bash -x /usr/share/wechatpush/wechatpush t1`.
+- Run `opkg update` before installation or upgrade to refresh package indexes.
+- In LuCI, open “Services / WeChat Push”, choose a notification provider, enter its credentials, and enable the service.
+- For WeCom trusted-IP restrictions, allow the public egress IP of the configured proxy in the WeCom administration console.
+- Enable QWRT-native traffic or online detection only on QWRT 2026.10.6 or later.
+- Provide a valid IPv4 ip2region XDB file yourself and enter its actual path in Basic Settings.
 
-## DownLoad
+## Troubleshooting
 
-| Supported OpenWrt Versions | Download Link |
-| :-------- | :----- |
-| openwrt-19.07.0 ... latest | [![Lastest Release](https://img.shields.io/github/release/tty228/luci-app-wechatpush.svg?style=flat)](https://github.com/tty228/luci-app-wechatpush/releases)
-| openwrt-18.06 | [![Release v2.06.2](https://img.shields.io/badge/release-v2.06.2-lightgrey.svg)](https://github.com/tty228/luci-app-wechatpush/releases/tag/v2.06.2)
+When reporting an issue, include the device model, firmware version, package version, and relevant logs. Run:
 
-## Donate
+```sh
+/usr/share/wechatpush/wechatpush
+bash -x /usr/share/wechatpush/wechatpush t1
+```
 
-If you feel that this project is helpful to you, please donate to us so that the project can continue to develop and be more perfect.
+Also include relevant log or debug files from `/tmp/wechatpush/`. Do not post WeCom Secrets, bot tokens, email passwords, or other credentials in public issues.
 
-![image](https://github.com/tty228/luci-app-wechatpush/blob/master/.github/others/20260303202537_34_664.png)
+## Project links
+
+- This repository: <https://github.com/jarod360/luci-app-wechatpush>
+- Upstream project: <https://github.com/tty228/luci-app-wechatpush>
+
+Licensed under GPL-2.0.
