@@ -732,16 +732,15 @@ return view.extend({
 		o.value('interface', _('Notify only devices using this interface'),
 			_('Multiple selections are not supported at the moment'));
 
-		o = s.taboption('disturb', form.Flag, 'offline_detection_list_enable', _('Offline custom detection list'));
-		o.default = 0;
-		o.rmempty = true;
-		o.description = _('When enabled, devices in the Offline detection list use custom detection; all other devices use the default detection logic.');
+		o.value('offline_custom', _('Offline custom detection'),
+			_('Devices in the Offline detection list use custom timeout and detection count; all other devices use the default detection logic. Push eligibility is unchanged.'));
 
 		o = fwtool.addMACOption(s, 'disturb', 'offline_detection_mac_list', _('Offline detection list'),
 			_('Please select device MAC'), hosts);
 		o.datatype = 'list(neg(macaddr))';
 		o.rmempty = true;
-		o.description = _('Devices in this list use the custom offline detection timeout and count. Other devices use the default detection logic. Enabling this list does not change push eligibility; all devices remain subject to the existing push notification settings.');
+		o.depends('mac_filtering_mode_1', 'offline_custom');
+		o.description = _('Devices in this list use the custom offline detection timeout and count. Other devices use the default detection logic. This list only changes detection parameters and does not affect push notifications.');
 
 		o = fwtool.addMACOption(s, 'disturb', 'up_down_push_whitelist', _('Ignored device list'),
 			_('Please select device MAC'), hosts);
