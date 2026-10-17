@@ -8,7 +8,7 @@
 
 ## Overview
 
-**luci-app-wechatpush** is an OpenWrt LuCI plugin for network monitoring and notifications. This repository is a maintained fork of [tty228/luci-app-wechatpush](https://github.com/tty228/luci-app-wechatpush). It retains the upstream notification and monitoring functions, as well as the original fork's HTTP/SOCKS forward-proxy support, while adding QWRT-native traffic and online detection, IP geolocation lookup, batched device-event notifications, and compatibility fixes.
+**luci-app-wechatpush** is an OpenWrt LuCI plugin for network monitoring and notifications. This repository is a maintained fork of [tty228/luci-app-wechatpush](https://github.com/tty228/luci-app-wechatpush). It retains the upstream notification and monitoring functions while adding QWRT-native traffic and online detection, IP geolocation lookup, batched device-event notifications, and compatibility fixes.
 
 Current package version: **3.6.19-1**
 
@@ -22,10 +22,6 @@ Current package version: **3.6.19-1**
 - **Security notifications and protection**: Web/SSH login alerts, automatic banning after failed logins, optional blocking of forwarded traffic from blacklisted IPs, and port knocking.
 - **Unattended tasks**: Run configured automation based on device presence, Do-Not-Disturb periods, and other conditions.
 - **Notification providers**: Server Chan, Server Chan 3, PushPlus, WPUSH, WxPusher, WeCom, Telegram Bot, msmtp email, and custom API templates.
-
-## Existing fork functionality
-
-- **WeCom HTTP/SOCKS forward proxy**: Supports a configurable HTTP/SOCKS forward proxy. WeCom token retrieval, image-message media uploads, and message sending all use this proxy. This is an existing fork feature, not a newly added extension.
 
 ## Main fork-specific extensions
 
