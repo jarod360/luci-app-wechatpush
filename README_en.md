@@ -49,7 +49,7 @@ The offline timeout and detection count in Advanced Settings control offline con
 
 - When “Offline timeout applies only to the devices that receive push notifications” is disabled, all devices continue to use the custom timeout and count; the new list does not change this behavior.
 - When that option is enabled but the new list switch is disabled, parameter selection follows this fork's original push-filter logic.
-- When both switches are enabled, MAC addresses in the list use the custom timeout and count. Devices outside the list, an empty list, or devices whose MAC cannot be obtained use the QWRT defaults of **10 seconds and 2 checks**.
+- When both switches are enabled, MAC addresses in the list use the custom timeout and count. Devices outside the list, an empty list, or devices whose MAC cannot be obtained use the default detection parameters of **10 seconds and 2 checks**.
 - The list selects detection parameters only. It does not change push eligibility; actual notifications remain subject to the existing notification switches and filters.
 
 ### Notification content and client information
