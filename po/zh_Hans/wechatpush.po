@@ -1658,10 +1658,16 @@ msgstr "上传 / 下载"
 
 
 msgid "Offline custom detection list"
-msgstr "离线自定义检测名单"
+msgstr "离线自定义检测列表"
 
-msgid "Devices in this list use the custom offline detection timeout and count. The list does not change the existing push notification filtering rules."
-msgstr "此列表设备使用自定义检测，其他设备使用默认检测。列表中的设备使用自定义检测超时和次数，其他设备使用模式默认检测逻辑。设置此名单不影响原有推送过滤规则。"
+msgid "When enabled, devices in the Offline detection list use custom detection; all other devices use the default detection logic."
+msgstr "启用后，离线检测列表中的设备使用自定义检测，其他设备使用默认检测。"
 
-msgid "When this option is active, the original push-notification filter determines which devices use the custom offline timeout and detection count; other devices use the default values. The offline custom detection MAC list in MAC Filtering Mode 1 only restores the custom timeout and count for matching devices that the original filter excludes. It does not change push-notification filtering, and it has no effect unless this original option is active."
-msgstr "此选项按原有逻辑生效时，原有推送过滤判定决定哪些设备使用自定义离线超时和检测次数，其他设备使用默认值。MAC 过滤模式一中的离线自定义检测名单，仅对原有过滤排除且 MAC 命中的设备恢复自定义超时和次数；它不改变推送过滤结果，原有选项未生效时名单不参与判断。"
+msgid "Offline detection list"
+msgstr "离线检测列表"
+
+msgid "Devices in this list use the custom offline detection timeout and count. Other devices use the default detection logic. Enabling this list does not change push eligibility; all devices remain subject to the existing push notification settings."
+msgstr "列表中的设备使用自定义检测超时和次数，其他设备使用模式默认检测逻辑。启用此名单不影响设备推送资格，所有设备仍按原有推送设置处理。"
+
+msgid "When disabled, all devices use the custom timeout and detection count. When enabled, the original push filter determines which devices use custom settings, unless the Offline custom detection list is enabled in MAC Filtering Mode 1; then only devices in that list use custom settings and all others use the default values (10 seconds and 2 checks). The list changes detection parameters only and never changes push eligibility."
+msgstr "未勾选时，所有设备使用自定义检测超时和次数。勾选后，默认按原有推送过滤逻辑决定哪些设备使用自定义参数；如果同时启用了 MAC 过滤模式一中的离线自定义检测列表，则仅列表内设备使用自定义参数，其他设备使用默认值（10 秒、2 次）。该名单只影响检测参数，不改变任何设备的推送资格。"
