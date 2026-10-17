@@ -722,16 +722,6 @@ return view.extend({
 		o.depends('do_not_disturb_mode', '1');
 		o.depends('do_not_disturb_mode', '2');
 
-		o = s.taboption('disturb', form.Flag, 'offline_detection_list_enable', _('Enable offline detection device list'));
-		o.default = 0;
-		o.rmempty = true;
-		o.description = _('Devices in this list use the custom offline detection timeout and count; other devices use the default detection logic. Enabling this list does not affect push notifications for any device.');
-
-		o = fwtool.addMACOption(s, 'disturb', 'offline_detection_mac_list', _('Offline detection device list'),
-			_('Please select device MAC'), hosts);
-		o.datatype = 'list(neg(macaddr))';
-		o.depends('offline_detection_list_enable', '1');
-
 		o = s.taboption('disturb', cbiRichListValue, 'mac_filtering_mode_1', _('MAC Filtering Mode 1'));
 		o.value('', _('Close'),
 			_(' '));
@@ -741,6 +731,12 @@ return view.extend({
 			_('Ignored devices will not receive notifications or be logged'));
 		o.value('interface', _('Notify only devices using this interface'),
 			_('Multiple selections are not supported at the moment'));
+
+		o = fwtool.addMACOption(s, 'disturb', 'offline_detection_mac_list', _('Offline custom detection list'),
+			_('Please select device MAC'), hosts);
+		o.datatype = 'list(neg(macaddr))';
+		o.rmempty = true;
+		o.description = _('Devices in this list use the custom offline detection timeout and count. The list does not change the existing push notification filtering rules.');
 
 		o = fwtool.addMACOption(s, 'disturb', 'up_down_push_whitelist', _('Ignored device list'),
 			_('Please select device MAC'), hosts);
