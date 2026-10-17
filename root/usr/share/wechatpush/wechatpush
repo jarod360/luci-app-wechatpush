@@ -51,7 +51,7 @@ read_config() {
 		"login_notification" "login_max_num" "login_web_black" "login_ip_black_timeout" "block_blacklisted_forwarding" "login_ip_white_list" "port_knocking_enable" "login_ip_white_timeout" "login_port_white" "login_port_forward_list" \
 		"crontab_regular_time" "crontab_interval_time" \
 		"do_not_disturb_mode" "do_not_disturb_starttime" "do_not_disturb_endtime" "up_down_push_whitelist" "up_down_push_blacklist" "up_down_push_interface" "mac_online_list" "mac_offline_list" "cpu_threshold_duration" "cpu_notification_delay" "login_disturb" "login_notification_delay" "login_log_enable" \
-		"up_timeout" "down_timeout" "timeout_retry_count" "always_check_ip_list" "only_timeout_push" "offline_detection_mac_list" "passive_mode" "thread_num" "defaultSortColumn" "soc_code" "server_host" "server_port" \
+		"up_timeout" "down_timeout" "timeout_retry_count" "always_check_ip_list" "only_timeout_push" "offline_detection_list_enable" "offline_detection_mac_list" "passive_mode" "thread_num" "defaultSortColumn" "soc_code" "server_host" "server_port" \
 		"unattended_enable" "zerotier_helper" "unattended_only_on_disturb_time" "unattended_device_aliases" "network_disconnect_event" "unattended_autoreboot_mode" "autoreboot_system_uptime" "autoreboot_network_uptime" \
 		"device_info_helper" "gateway_host_url" "gateway_info_url" "gateway_logout_url" "gateway_username_id" "gateway_password_id" "gateway_username" "gateway_password" "miwifi_ip" "miwifi_password" "mikrotik_ip" "mikrotik_username" "op_host_ips" "scan_ip_range" "device_info_helper_sleeptime"
 
@@ -2287,16 +2287,23 @@ down() {
 	[ -z "$ip" ] && return 1
 	local mac=$(getmac "$ip")
 
-	# 保留原有 only_timeout_push + blackwhitelist 判定，只为原本不符合推送条件的设备增加 MAC 例外名单。
+	# 默认使用页面自定义检测参数；仅在“离线超时仅针对推送设备”启用时，才按对应模式切换。
 	local tmp_timeout="$down_timeout"
 	local tmp_retry_count="$timeout_retry_count"
 	if [ "$only_timeout_push" = "1" ]; then
-		blackwhitelist "$mac"
-		local ip_blackwhite=$?
-		if [ "$ip_blackwhite" -ne 0 ]; then
-			# 仅名单内且 MAC 有效的设备恢复使用页面自定义检测参数。
-			# MAC 为空、名单为空或未命中时，完全沿用原有默认检测参数。
-			if [ -z "$mac" ] || [ -z "$offline_detection_mac_list" ] || ! printf '%s\n' "$offline_detection_mac_list" | grep -Fqi -x -- "$mac"; then
+		if [ "$offline_detection_list_enable" = "1" ]; then
+			# 启用独立离线检测名单后：名单内且 MAC 有效的设备使用自定义参数，其余设备使用 QWRT 默认值。
+			tmp_timeout=10
+			tmp_retry_count=2
+			if [ -n "$mac" ] && [ -n "$offline_detection_mac_list" ] && printf '%s\n' "$offline_detection_mac_list" | grep -Fqi -x -- "$mac"; then
+				tmp_timeout="$down_timeout"
+				tmp_retry_count="$timeout_retry_count"
+			fi
+		else
+			# 未启用新名单时，严格保留 fork 原有 blackwhitelist 检测参数判定。
+			blackwhitelist "$mac"
+			local ip_blackwhite=$?
+			if [ "$ip_blackwhite" -ne 0 ]; then
 				tmp_timeout=10
 				tmp_retry_count=2
 			fi
