@@ -1654,14 +1654,14 @@ msgstr "流量详情"
 msgid "Upload / Download"
 msgstr "上传 / 下载"
 
-msgid "Enable offline detection device list"
-msgstr "启用离线检测名单"
 
-msgid "Offline detection device list"
-msgstr "离线检测名单"
 
-msgid "Devices in this list use the custom offline detection timeout and count; other devices use the default detection logic. Enabling this list does not affect push notifications for any device."
-msgstr "列表中的设备使用自定义检测超时和次数，其他设备使用模式默认检测逻辑。启用此名单不影响所有设备推送。"
 
-msgid "When this option is selected, the offline timeout and offline detection count apply only to the devices that require push notifications. Other devices will use default values, which can significantly reduce the time required for detection. However, it may result in inaccurate online time displayed in the online devices list. It is recommended to enable this option only when there are many devices and frequent offline occurrences are observed for specific devices of interest. When the independent offline detection device list in MAC Filtering Mode 1 is enabled, that list takes precedence; this option retains its original behavior when the new list is disabled."
-msgstr "启用此选项后，离线超时和检测次数仅应用于需要推送通知的设备，其他设备使用默认值，可显著缩短检测时间，但可能导致在线设备列表中的在线时长不准确。建议仅在设备较多且关注的特定设备频繁误报时启用。当 MAC 过滤模式一中的独立离线检测名单启用时，以该名单为准；关闭新名单时，此选项保持原有行为。"
+msgid "Offline custom detection list"
+msgstr "离线自定义检测名单"
+
+msgid "Devices in this list use the custom offline detection timeout and count. The list does not change the existing push notification filtering rules."
+msgstr "此列表设备使用自定义检测，其他设备使用默认检测。列表中的设备使用自定义检测超时和次数，其他设备使用模式默认检测逻辑。设置此名单不影响原有推送过滤规则。"
+
+msgid "When this option is active, the original push-notification filter determines which devices use the custom offline timeout and detection count; other devices use the default values. The offline custom detection MAC list in MAC Filtering Mode 1 only restores the custom timeout and count for matching devices that the original filter excludes. It does not change push-notification filtering, and it has no effect unless this original option is active."
+msgstr "此选项按原有逻辑生效时，原有推送过滤判定决定哪些设备使用自定义离线超时和检测次数，其他设备使用默认值。MAC 过滤模式一中的离线自定义检测名单，仅对原有过滤排除且 MAC 命中的设备恢复自定义超时和次数；它不改变推送过滤结果，原有选项未生效时名单不参与判断。"
