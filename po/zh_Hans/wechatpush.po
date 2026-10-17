@@ -1663,8 +1663,8 @@ msgstr "离线自定义检测"
 msgid "Devices in this list use custom detection; all other devices use the default detection logic. Push eligibility is unchanged."
 msgstr "此列表设备使用自定义检测，其他设备使用默认检测。设备推送资格保持不变。"
 
-msgid "This list only changes detection parameters and does not affect push notifications."
-msgstr "此名单仅调整检测参数，不影响设备推送。"
+msgid "Devices in this list use the custom offline detection timeout and count. Other devices use the default detection logic. Enabling this list does not affect push notifications for any device."
+msgstr "列表中的设备使用自定义检测超时和次数，其他设备使用模式默认检测逻辑。启用此名单不影响所有设备推送。"
 
 msgid "When disabled, all devices use the custom timeout and detection count, except when Offline custom detection is selected in MAC Filtering Mode 1. When enabled, the original MAC filtering and push eligibility logic determines which devices use custom settings, unless Offline custom detection is selected; then only devices in its MAC list use custom settings and all others use the default values (10 seconds and 2 checks). This setting never changes push eligibility."
 msgstr "未勾选时，除非在 MAC 过滤模式一中选择“离线自定义检测”，否则所有设备使用自定义检测超时和次数。勾选后，按原有 MAC 过滤和推送资格逻辑决定哪些设备使用自定义参数；如果选择了“离线自定义检测”，则仅名单内设备使用自定义参数，其他设备使用默认值（10 秒、2 次）。此设置不改变设备推送资格。"
