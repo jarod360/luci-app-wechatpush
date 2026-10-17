@@ -1,16 +1,16 @@
 # luci-app-wechatpush
 
 [![Build](https://github.com/jarod360/luci-app-wechatpush/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/jarod360/luci-app-wechatpush/actions/workflows/build.yml)
-![Version](https://img.shields.io/badge/version-3.6.64-blue)
+![Version](https://img.shields.io/badge/version-3.6.19-blue)
 [![License](https://img.shields.io/badge/license-GPL--2.0-blue.svg)](LICENSE)
 
 [简体中文](README.md) | [English](README_en.md)
 
 ## Overview
 
-**luci-app-wechatpush** is an OpenWrt LuCI plugin for network monitoring and notifications. This repository is a maintained fork of [tty228/luci-app-wechatpush](https://github.com/tty228/luci-app-wechatpush). It retains the upstream notification and monitoring functions while adding configurable WeCom API routing, QWRT-native traffic and online detection, IP geolocation lookup, batched device-event notifications, and compatibility fixes.
+**luci-app-wechatpush** is an OpenWrt LuCI plugin for network monitoring and notifications. This repository is a maintained fork of [tty228/luci-app-wechatpush](https://github.com/tty228/luci-app-wechatpush). It retains the upstream notification and monitoring functions, as well as the original fork's HTTP/SOCKS forward-proxy support, while adding QWRT-native traffic and online detection, IP geolocation lookup, batched device-event notifications, and compatibility fixes.
 
-Current package version: **3.6.64-1**
+Current package version: **3.6.19-1**
 
 ## Features
 
@@ -21,18 +21,25 @@ Current package version: **3.6.64-1**
 - **System and host monitoring**: Monitor router CPU, temperature, and runtime status; retrieve temperature and disk information from remote hosts such as PVE over SSH.
 - **Security notifications and protection**: Web/SSH login alerts, automatic banning after failed logins, optional blocking of forwarded traffic from blacklisted IPs, and port knocking.
 - **Unattended tasks**: Run configured automation based on device presence, Do-Not-Disturb periods, and other conditions.
-- **IP geolocation**: Look up locations for login alerts. IPv4 can use a configured local ip2region XDB database first, with online lookup as fallback. Results are normalized without continent, district/county, ISP, or ASN details.
 - **Notification providers**: Server Chan, Server Chan 3, PushPlus, WPUSH, WxPusher, WeCom, Telegram Bot, msmtp email, and custom API templates.
 
-## Main fork-specific changes
+## Existing fork functionality
+
+- **WeCom HTTP/SOCKS forward proxy**: Supports a configurable HTTP/SOCKS forward proxy. WeCom token retrieval, image-message media uploads, and message sending all use this proxy. This is an existing fork feature, not a newly added extension.
+
+## Main fork-specific extensions
 
 The following summarizes the major additions and maintenance changes compared with the upstream repository. Exact behavior is defined by the current source code.
 
-### WeCom API and proxy
+### IP geolocation extension
+
+- Look up locations for login alerts.
+- IPv4 can use a configured local ip2region XDB database first, with online lookup as fallback.
+- Results are normalized without continent, district/county, ISP, or ASN details.
+
+### WeCom API Base URL
 
 - Configure a custom WeCom API Base URL; when empty, the official API endpoint is used.
-- Configure an HTTP/SOCKS forward proxy. WeCom token retrieval, media upload for image messages, and message sending all use the configured proxy.
-- The API Base URL selects the destination host, while the proxy selects the network route; they are independent settings.
 
 ### QWRT-native features
 
@@ -72,7 +79,7 @@ The package architecture is `all`. OpenWrt's package manager resolves the requir
 To install a package built by this repository's GitHub Actions, download the matching artifact and run, for example:
 
 ```sh
-opkg install ./luci-app-wechatpush_3.6.64-1_all.ipk
+opkg install ./luci-app-wechatpush_3.6.19-1_all.ipk
 ```
 
 Optional dependencies:
