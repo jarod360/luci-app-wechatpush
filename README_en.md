@@ -52,11 +52,23 @@ For devices that do not declare hostnames, devices connected via optical modem d
 
 **Regarding Device Online Status:**
 
-By default, ping/arping is used to actively detect device online status to counter Wi-Fi sleep mechanism. Active detection takes more time but provides more accurate device online status.
+“QWRT native online detection” is disabled by default. When disabled, the plugin retains its original active-detection flow: it checks the wireless station state, then uses the existing ARP information to choose `arping` or `ping`, applying the configured detection parameters. Enable this option only when using QWRT 2026.10.6 or later.
 
-- If devices frequently go into sleep mode, please adjust the timeout settings in advanced settings.
-- If you don't require highly precise device online information and only need other features, you can disable active detection in advanced settings.
+When enabled, online status is determined using the same ARP/MAC rules as the QWRT LuCI overview. The plugin reads `/usr/libexec/luci-arp` (which outputs `/proc/net/arp` by default on QWRT), counts only valid unicast MAC records with valid IPv4 addresses on `br-lan` whose ARP flags include `0x2`, and determines device status by MAC address. It does not send ping/arping probes. Device status is polled every 5 seconds by default; if `sleeptime` is configured below 5 seconds, that shorter interval is used. Routine tasks such as network checks and traffic alerts continue to follow `sleeptime`. Because this method depends on the current ARP table, sleeping devices or devices without a valid ARP entry may be reported offline.
 
+**Offline timeout and detection count:** The “Device offline detection timeout” and “Offline detection count” settings in Advanced determine the offline confirmation conditions together. With QWRT native detection, the first failed check counts as failure number 1. A device is marked offline only after both the configured timeout has elapsed and the configured total number of failed checks has been reached. The count is the total number of failed checks, not the number of additional retries after the first failure. If the count is reached before the timeout, the plugin waits for the timeout condition rather than performing an extra probe. If a later poll finds the device online again before offline confirmation, its status returns to online and the pending failure counters are cleared; no offline event is generated for that pending outage. For example, with a timeout of 15 seconds and a count of 3, the first failure is count 1; offline is confirmed only after at least 15 seconds and 3 failed checks. Actual check times may vary slightly with the 5-second polling interval.
+
+**Choose devices for custom offline detection:** In the “MAC Filtering Mode 1” area, enable “Offline detection device list” and select the MAC addresses that should use custom detection parameters:
+- Devices in the list use the configured offline timeout and detection count from Advanced settings.
+- Devices not in the list use the fixed defaults: 10 seconds and 2 checks.
+- This list controls detection parameters only. It does not filter online/offline notifications; all devices continue to follow the existing notification switches, MAC filters, and Do Not Disturb rules.
+- If the list is enabled but no MAC addresses are selected, no device matches it, so all devices use the default 10-second, 2-check settings.
+
+**Legacy “Offline timeout applies only to the devices that receive push notifications” option:** When the new independent offline detection list is disabled, this option retains its original behavior. It uses the existing online/offline notification-filter decision to determine which devices receive the custom timeout and count; devices that do not pass that filter use the defaults of 10 seconds and 2 checks. If no online/offline notification filters are configured, all devices qualify for notifications, so the legacy option applies the custom detection parameters to all devices rather than narrowing detection to a particular device. When the new independent list is enabled, that list takes precedence and the legacy option no longer selects detection targets.
+
+- If devices frequently sleep, adjust the offline timeout and detection count according to the device behavior.
+- If precise online status is not required, you can disable active detection in Advanced settings.
+- QWRT native online detection is disabled by default; do not enable it on non-QWRT systems.
 
 **Regarding Traffic Statistics:**
 
