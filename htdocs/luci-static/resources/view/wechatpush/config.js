@@ -722,6 +722,16 @@ return view.extend({
 		o.depends('do_not_disturb_mode', '1');
 		o.depends('do_not_disturb_mode', '2');
 
+		o = s.taboption('disturb', form.Flag, 'offline_detection_list_enable', _('Enable offline detection device list'));
+		o.default = 0;
+		o.rmempty = true;
+		o.description = _('Devices in this list use the custom offline detection timeout and count; other devices use the default detection logic. Enabling this list does not affect push notifications for any device.');
+
+		o = fwtool.addMACOption(s, 'disturb', 'offline_detection_mac_list', _('Offline detection device list'),
+			_('Please select device MAC'), hosts);
+		o.datatype = 'list(neg(macaddr))';
+		o.depends('offline_detection_list_enable', '1');
+
 		o = s.taboption('disturb', cbiRichListValue, 'mac_filtering_mode_1', _('MAC Filtering Mode 1'));
 		o.value('', _('Close'),
 			_(' '));

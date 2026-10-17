@@ -51,7 +51,7 @@ read_config() {
 		"login_notification" "login_max_num" "login_web_black" "login_ip_black_timeout" "block_blacklisted_forwarding" "login_ip_white_list" "port_knocking_enable" "login_ip_white_timeout" "login_port_white" "login_port_forward_list" \
 		"crontab_regular_time" "crontab_interval_time" \
 		"do_not_disturb_mode" "do_not_disturb_starttime" "do_not_disturb_endtime" "up_down_push_whitelist" "up_down_push_blacklist" "up_down_push_interface" "mac_online_list" "mac_offline_list" "cpu_threshold_duration" "cpu_notification_delay" "login_disturb" "login_notification_delay" "login_log_enable" \
-		"up_timeout" "down_timeout" "timeout_retry_count" "always_check_ip_list" "only_timeout_push" "passive_mode" "thread_num" "defaultSortColumn" "soc_code" "server_host" "server_port" \
+		"up_timeout" "down_timeout" "timeout_retry_count" "always_check_ip_list" "only_timeout_push" "offline_detection_list_enable" "offline_detection_mac_list" "passive_mode" "thread_num" "defaultSortColumn" "soc_code" "server_host" "server_port" \
 		"unattended_enable" "zerotier_helper" "unattended_only_on_disturb_time" "unattended_device_aliases" "network_disconnect_event" "unattended_autoreboot_mode" "autoreboot_system_uptime" "autoreboot_network_uptime" \
 		"device_info_helper" "gateway_host_url" "gateway_info_url" "gateway_logout_url" "gateway_username_id" "gateway_password_id" "gateway_username" "gateway_password" "miwifi_ip" "miwifi_password" "mikrotik_ip" "mikrotik_username" "op_host_ips" "scan_ip_range" "device_info_helper_sleeptime"
 
@@ -96,6 +96,7 @@ read_config() {
 	login_port_forward_list=$(echo "$login_port_forward_list" | sed 's/ /\n/g') 2>/dev/null
 	up_down_push_blacklist=$(echo "$up_down_push_blacklist" | sed 's/ /\n/g') 2>/dev/null
 	up_down_push_whitelist=$(echo "$up_down_push_whitelist" | sed 's/ /\n/g') 2>/dev/null
+	offline_detection_mac_list=$(echo "$offline_detection_mac_list" | sed 's/ /\n/g') 2>/dev/null
 	device_aliases_path="/usr/share/wechatpush/api/device_aliases.list"
 	always_check_ip_list=$(echo "$always_check_ip_list" | sed 's/ /\n/g') 2>/dev/null
 	unattended_device_aliases=$(echo "$unattended_device_aliases" | sed 's/ /\n/g') 2>/dev/null
@@ -2286,18 +2287,23 @@ down() {
 	[ -z "$ip" ] && return 1
 	local mac=$(getmac "$ip")
 
-	# 默认使用页面配置；仅在“仅推送超时设备”开关明确开启时执行 MAC 名单过滤。
+	# 独立离线检测名单只决定检测参数，不参与上下线通知过滤。
 	local tmp_timeout="$down_timeout"
 	local tmp_retry_count="$timeout_retry_count"
-	local ip_blackwhite=0
-	if [ "$only_timeout_push" = "1" ]; then
+	if [ "$offline_detection_list_enable" = "1" ]; then
+		if [ -z "$mac" ] || ! printf '%s\n' "$offline_detection_mac_list" | grep -Fqi -x -- "$mac"; then
+			tmp_timeout=10
+			tmp_retry_count=2
+		fi
+	# 未启用新名单时，完整保留旧版 only_timeout_push 行为。
+	elif [ "$only_timeout_push" = "1" ]; then
+		local ip_blackwhite=0
 		blackwhitelist "$mac"
 		ip_blackwhite=$?
-	fi
-	# 名单外设备仍按内置快速检测参数判断，名单内设备使用页面自定义参数。
-	if [ "$ip_blackwhite" -ne 0 ]; then
-		tmp_timeout=10
-		tmp_retry_count=2
+		if [ "$ip_blackwhite" -ne 0 ]; then
+			tmp_timeout=10
+			tmp_retry_count=2
+		fi
 	fi
 	# QWRT 原生检测按“总失败检测次数”计数，并将这些检测均匀安排在超时窗口内。
 	# 已达到配置次数但尚未达到超时时间时只等待，不再额外探测，避免多出一次检测。
