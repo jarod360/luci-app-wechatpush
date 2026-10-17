@@ -1,7 +1,7 @@
 # luci-app-wechatpush
 
 [![Build](https://github.com/jarod360/luci-app-wechatpush/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/jarod360/luci-app-wechatpush/actions/workflows/build.yml)
-![Version](https://img.shields.io/badge/version-3.6.63-blue)
+![Version](https://img.shields.io/badge/version-3.6.64-blue)
 [![License](https://img.shields.io/badge/license-GPL--2.0-blue.svg)](LICENSE)
 
 [简体中文](README.md) | [English](README_en.md)
@@ -10,7 +10,7 @@
 
 **luci-app-wechatpush** is an OpenWrt LuCI plugin for network monitoring and notifications. This repository is a maintained fork of [tty228/luci-app-wechatpush](https://github.com/tty228/luci-app-wechatpush). It retains the upstream notification and monitoring functions while adding configurable WeCom API routing, QWRT-native traffic and online detection, IP geolocation lookup, batched device-event notifications, and compatibility fixes.
 
-Current package version: **3.6.63-1**
+Current package version: **3.6.64-1**
 
 ## Features
 
@@ -45,11 +45,11 @@ Both QWRT options are independent and disabled by default. Do not enable them on
 
 ### Offline detection parameters and MAC list
 
-The offline timeout and detection count in Advanced Settings control offline confirmation. A new “Offline custom detection” mode is available in “MAC Filtering Mode 1”. Selecting it reveals the “Offline detection list” MAC selector:
+The offline timeout and detection count in Advanced Settings control offline confirmation. A new “Offline custom detection devices” mode is available in “MAC Filtering Mode 1”. Selecting it reveals the “Offline custom detection list” MAC selector:
 
-- When “Offline timeout applies only to the devices that receive push notifications” is disabled, all devices in the original modes continue to use the custom timeout and count. Selecting the new “Offline custom detection” mode instead applies the MAC-list-based detection parameters.
+- When “Offline timeout applies only to the devices that receive push notifications” is disabled, all devices in the original modes continue to use the custom timeout and count. Selecting the new “Offline custom detection devices” mode instead applies the MAC-list-based detection parameters.
 - Selecting any of the original modes (including “Close”) preserves this fork's original detection-parameter selection and push-filter behavior.
-- When “Offline custom detection” is selected, MAC addresses in the list use the custom timeout and count. Devices outside the list, an empty list, or devices whose MAC cannot be obtained use the default detection parameters of **10 seconds and 2 checks**.
+- When “Offline custom detection devices” is selected, MAC addresses in the list use the custom timeout and count. Devices outside the list, an empty list, or devices whose MAC cannot be obtained use the default detection parameters of **10 seconds and 2 checks**.
 - The list selects detection parameters only. It does not change push eligibility; actual notifications remain subject to the existing notification switches and filters.
 
 ### Notification content and client information
@@ -72,7 +72,7 @@ The package architecture is `all`. OpenWrt's package manager resolves the requir
 To install a package built by this repository's GitHub Actions, download the matching artifact and run, for example:
 
 ```sh
-opkg install ./luci-app-wechatpush_3.6.63-1_all.ipk
+opkg install ./luci-app-wechatpush_3.6.64-1_all.ipk
 ```
 
 Optional dependencies:
