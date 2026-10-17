@@ -1,7 +1,7 @@
 # luci-app-wechatpush
 
 [![Build](https://github.com/jarod360/luci-app-wechatpush/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/jarod360/luci-app-wechatpush/actions/workflows/build.yml)
-![Version](https://img.shields.io/badge/version-3.6.62-blue)
+![Version](https://img.shields.io/badge/version-3.6.63-blue)
 [![License](https://img.shields.io/badge/license-GPL--2.0-blue.svg)](LICENSE)
 
 [简体中文](README.md) | [English](README_en.md)
@@ -10,7 +10,7 @@
 
 **luci-app-wechatpush** is an OpenWrt LuCI plugin for network monitoring and notifications. This repository is a maintained fork of [tty228/luci-app-wechatpush](https://github.com/tty228/luci-app-wechatpush). It retains the upstream notification and monitoring functions while adding configurable WeCom API routing, QWRT-native traffic and online detection, IP geolocation lookup, batched device-event notifications, and compatibility fixes.
 
-Current package version: **3.6.62-1**
+Current package version: **3.6.63-1**
 
 ## Features
 
@@ -72,7 +72,7 @@ The package architecture is `all`. OpenWrt's package manager resolves the requir
 To install a package built by this repository's GitHub Actions, download the matching artifact and run, for example:
 
 ```sh
-opkg install ./luci-app-wechatpush_3.6.62-1_all.ipk
+opkg install ./luci-app-wechatpush_3.6.63-1_all.ipk
 ```
 
 Optional dependencies:
