@@ -723,11 +723,11 @@ return view.extend({
 		o.depends('do_not_disturb_mode', '2');
 
 		o = s.taboption('disturb', cbiRichListValue, 'mac_filtering_mode_1', _('MAC Filtering Mode 1'));
-		o.value('offline_custom', _('Offline custom detection devices'),
-			_('Devices in this list use custom detection; all other devices use the default detection.'));
-
 		o.value('', _('Close'),
 			_(' '));
+
+		o.value('offline_custom', _('Offline custom detection devices'),
+			_('Devices in this list use custom detection; all other devices use the default detection.'));
 		o.value('allow', _('Ignore devices in the list'),
 			_('Ignored devices will not receive notifications or be logged'));
 		o.value('block', _('Notify only devices in the list'),
