@@ -17,7 +17,6 @@ Current package version: **3.6.20-1**
 - **Network notifications**: Detect IPv4/IPv6 address changes and report network status.
 - **Client monitoring**: Track LAN device online/offline status and display connected clients; supports device aliases and MAC vendor information.
 - **Batched device events**: Combine device state changes found during one detection cycle into a single notification.
-- **Traffic monitoring**: On supported QWRT systems, read native cumulative traffic and trigger abnormal-traffic alerts based on per-minute traffic increments.
 - **System and host monitoring**: Monitor router CPU, temperature, and runtime status; retrieve temperature and disk information from remote hosts such as PVE over SSH.
 - **Security notifications and protection**: Web/SSH login alerts, automatic banning after failed logins, optional blocking of forwarded traffic from blacklisted IPs, and port knocking.
 - **Unattended tasks**: Run configured automation based on device presence, Do-Not-Disturb periods, and other conditions.
@@ -39,6 +38,8 @@ The following summarizes the major additions and maintenance changes compared wi
 
 ### QWRT-native features
 
+**Native QWRT traffic statistics are an extension added by this fork.** This repository has removed the original third-party-plugin-based traffic monitoring to avoid compatibility conflicts with proxy-routing plugins. Current traffic features use only the new QWRT-native integration: cumulative traffic, device traffic display and per-minute traffic-increment alerts. Systems without compatible QWRT support have no fallback to the removed legacy traffic plugin.
+
 These options require **QWRT 2026.10.6 or later** and are enabled separately under Basic Settings:
 
 - **QWRT native traffic statistics**: Reads cumulative traffic through `luci.client-rates get`. The data is used for online-device information, device notifications, abnormal-traffic alerts, and unattended low-traffic checks. This implementation no longer depends on or calls the legacy `wrtbwmon`.
@@ -47,6 +48,8 @@ These options require **QWRT 2026.10.6 or later** and are enabled separately und
 Both QWRT options are independent and disabled by default. Do not enable them on non-QWRT systems.
 
 ### TP-LINK wireless presence assistance (3.6.20)
+
+**Added by this fork:** optional TP-LINK AC router integration provides a 30-second wireless disconnect check to reduce roaming false alarms and detector delays, with an online-client dialog.
 
 Disabled by default. Under Basic Settings, below QWRT native online detection, enable TP-LINK assistance, enter its management IPv4 address, username and password, then choose **Save & Apply**. No Home Assistant, SSH, diagnostic mode or TP-LINK configuration changes are required.
 
