@@ -2343,8 +2343,8 @@ down() {
 	# 默认沿用 fork 原有的自定义检测参数选择逻辑。
 	local tmp_timeout="$down_timeout"
 	local tmp_retry_count="$timeout_retry_count"
-	if [ "$mac_filtering_mode_1" = "offline_custom" ]; then
-		# 只有选择 MAC 过滤模式一的“离线自定义检测”时，才使用专用 MAC 名单。
+	if [ "$only_timeout_push" = "1" ] && [ "$mac_filtering_mode_1" = "offline_custom" ]; then
+		# 只有勾选超时仅针对推送设备，并选择 MAC 过滤模式一的“离线自定义检测”时，才使用专用 MAC 名单。
 		# 名单内设备使用自定义参数；名单外、空名单或无法获取 MAC 的设备使用默认参数。
 		tmp_timeout=10
 		tmp_retry_count=2

@@ -10,7 +10,7 @@
 
 **luci-app-wechatpush** is an OpenWrt LuCI plugin for network monitoring and notifications. This repository is a maintained fork of [tty228/luci-app-wechatpush](https://github.com/tty228/luci-app-wechatpush). It retains the upstream notification and monitoring functions while adding QWRT-native traffic and online detection, IP geolocation lookup, batched device-event notifications, and compatibility fixes.
 
-Current package version: **3.6.20-1**
+Current package version: **3.6.20-2**
 
 ## Features
 
@@ -71,9 +71,9 @@ Fix UTF-8 byte handling on QWRT Bash/musl, exact MAC/IP alias matching and liter
 
 The offline timeout and detection count in Advanced Settings control offline confirmation. A new “Offline custom detection devices” mode is available in “MAC Filtering Mode 1”. Selecting it reveals the “Offline custom detection list” MAC selector:
 
-- When “Offline timeout applies only to the devices that receive push notifications” is disabled, all devices in the original modes continue to use the custom timeout and count. Selecting the new “Offline custom detection devices” mode instead applies the MAC-list-based detection parameters.
+- When “Offline timeout applies only to the devices that receive push notifications” is disabled, all devices use the custom timeout and count, including in “Offline custom detection devices” mode.
 - Selecting any of the original modes (including “Close”) preserves this fork's original detection-parameter selection and push-filter behavior.
-- When “Offline custom detection devices” is selected, MAC addresses in the list use the custom timeout and count. Devices outside the list, an empty list, or devices whose MAC cannot be obtained use the default detection parameters of **10 seconds and 2 checks**.
+- When the timeout-only-for-push-devices option is enabled and “Offline custom detection devices” is selected, MAC addresses in the list use the custom timeout and count. Devices outside the list, an empty list, or devices whose MAC cannot be obtained use the default detection parameters of **10 seconds and 2 checks**.
 - The list selects detection parameters only. It does not change push eligibility; actual notifications remain subject to the existing notification switches and filters.
 
 ### Notification content and client information
@@ -96,7 +96,7 @@ The package architecture is `all`. OpenWrt's package manager resolves the requir
 To install a package built by this repository's GitHub Actions, download the matching artifact and run, for example:
 
 ```sh
-opkg install ./luci-app-wechatpush_3.6.20-1_all.ipk
+opkg install ./luci-app-wechatpush_3.6.20-2_all.ipk
 ```
 
 Optional dependencies:

@@ -115,6 +115,7 @@ jobs:
           python tests/test_tplink.py
           node tests/test_tplink_ui.js
           bash tests/test_tplink_down.sh
+          bash tests/test_offline_parameters.sh
           bash tests/test_device_aliases.sh
           bash tests/test_utf8.sh
           bash tests/test_template_utf8.sh
@@ -424,6 +425,8 @@ jobs:
           else
             version=$(sed -n 's/^PKG_VERSION:=//p' Makefile)
             tag="v${version}"
+            revision=$(sed -n 's/^PKG_RELEASE:=//p' Makefile)
+            if [ "${revision:-1}" -gt 1 ]; then tag="${tag}-r${revision}"; fi
             # Only an explicit release commit may create a version from master.
             expected=$(git log -1 --format=%s | awk '{print $2}')
             [ "$expected" = "$tag" ] || { echo 'Release commit/version mismatch'; exit 1; }
