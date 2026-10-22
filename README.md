@@ -120,8 +120,10 @@
 使用本仓库 GitHub Actions 构建产物时，下载对应的软件包后安装，例如：
 
 ```sh
-opkg install ./luci-app-wechatpush_3.6.20-3_all.ipk
+opkg install ./luci-app-wechatpush_3.6.20_all.ipk
 ```
+
+旧版 SDK 生成的 IPK 包内版本仍为 `3.6.20`。若已安装同版本的早期修订，更新 r3 时请使用 `opkg --force-reinstall install ./luci-app-wechatpush_3.6.20_all.ipk`，并更新对应中文语言包。APK 产物包含独立的 `-r3` 修订号。
 
 可选依赖：
 

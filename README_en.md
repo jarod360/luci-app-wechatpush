@@ -98,8 +98,10 @@ The package architecture is `all`. OpenWrt's package manager resolves the requir
 To install a package built by this repository's GitHub Actions, download the matching artifact and run, for example:
 
 ```sh
-opkg install ./luci-app-wechatpush_3.6.20-3_all.ipk
+opkg install ./luci-app-wechatpush_3.6.20_all.ipk
 ```
+
+The older SDK records the IPK package version as `3.6.20`. If an earlier revision of that version is already installed, use `opkg --force-reinstall install ./luci-app-wechatpush_3.6.20_all.ipk` for r3 and update the matching language package. APK builds carry the separate `-r3` revision.
 
 Optional dependencies:
 

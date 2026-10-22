@@ -12,14 +12,20 @@ qywx_get_token() { printf fixture-token; }
 qywx_upload_media() { printf fixture-media; }
 run_with_tag() {
  [ "$1" = curl ] || return 99
+ local request_payload=''
+ while [ "$#" -gt 0 ]; do
+  if [ "$1" = -d ]; then request_payload="${2#@}"; break; fi
+  shift
+ done
+ [ "$request_payload" = "$tempjsonpath" ] || return 40
  # Model another scanner cleaning the old globally shared request file.
  rm -f "$dir/shared.json"
  sleep 1
  local rendered
- rendered=$(jq -r '.text.content // .mpnews.articles[0].content' "$tempjsonpath") || return 41
+ rendered=$(jq -r '.text.content // .mpnews.articles[0].content' "$request_payload") || return 41
  [[ "$rendered" == *"$fixture_body"* ]] || return 42
- [ -z "$(LC_ALL=C tr -d '\000-\177' < "$tempjsonpath")" ] || return 43
- cp "$tempjsonpath" "$dir/captured.$fixture_id.json" || return 44
+ [ -z "$(LC_ALL=C tr -d '\000-\177' < "$request_payload")" ] || return 43
+ cp "$request_payload" "$dir/captured.$fixture_id.json" || return 44
  printf '{"errcode":0}'
 }
 userid=fixture; agentid=1; lite_enable=nowtime; str_linefeed='\n'; qywx_api_url=https://example.invalid
