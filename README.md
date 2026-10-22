@@ -10,7 +10,7 @@
 
 **luci-app-wechatpush** 是一个 OpenWrt LuCI 网络监控与消息通知插件。本仓库是基于上游 [tty228/luci-app-wechatpush](https://github.com/tty228/luci-app-wechatpush) 持续维护的 fork，在保留原有通知和监控功能的基础上，进一步扩展了 QWRT 原生流量与在线检测、IP 归属地查询、设备事件合并推送及多项兼容性修复。
 
-当前软件包版本：**3.6.20-2**
+当前软件包版本：**3.6.20-3**
 
 ## 主要功能
 
@@ -56,7 +56,7 @@
 1. 勾选“TP-LINK 路由器辅助检测”，填写 TP-LINK 的管理 IPv4 地址、用户名和密码。
 2. 点击弹窗中的“保存并应用”。正常连接后显示绿色“无线客户端在线 N”。
 3. 点击绿色数量按钮可查看名称、IP、MAC、所属 AP 和 SSID；手机窗口只显示名称、IP 地址和所属 AP。
-4. 弹窗优先显示 WeChatPush 已保存的设备别名：MAC 匹配优先，IP 匹配其次，然后使用 TP-LINK 名称；空名称或 `anonymous` 显示“未命名”。不会回写 TP-LINK 备注。点击“刷新”只读取后台最新缓存，不重新登录 TP-LINK。
+4. 弹窗优先显示 WeChatPush 已保存的设备别名：MAC 匹配优先，IP 匹配其次，其次读取 QWRT 主机名和主在线设备表名称，最后使用 TP-LINK 名称；所有来源均无有效名称时显示“未命名”。不会回写 TP-LINK 备注。点击“刷新”只读取后台最新缓存，不重新登录 TP-LINK。
 
 **最终检测规则：**
 
@@ -79,6 +79,10 @@
 更多协议、异常处理和测试方法见 [TP-LINK 辅助检测说明](docs/tplink-assist.md)。
 
 ### 3.6.20 修复与维护
+
+修订 **r3** 补充发送并发修复和名称回退：每次发送使用独立的权限 600 临时 JSON，避免设备、登录和定时通知相互覆盖，或被主循环清理；企业微信请求使用等价的 ASCII Unicode 转义传递中文、箭头和 emoji。并发回归测试在目标 QWRT 上验证了 12 条约 25KB 消息，网络发送使用测试桩。
+
+为核验偶发乱码，最近一次离线通知的标题、原始正文、JSON 和时间保留于 `/tmp/wechatpush/push_diagnostics/`，目录权限 700，不保存请求 URL、Cookie 或鉴权令牌；只保留一份并在下一次离线通知时覆盖，重启后消失。该诊断记录只在离线推送时写入，不按轮询持续积累。
 
 - 修复 QWRT Bash/musl 下中文、箭头、emoji 的 UTF-8 字节读取问题，避免设备名称或流量排版偶发出现 `�`。
 - 修复别名中 `%`、引号和 MAC/IP 前缀匹配问题，安全生成新设备 JSON。
@@ -116,7 +120,7 @@
 使用本仓库 GitHub Actions 构建产物时，下载对应的软件包后安装，例如：
 
 ```sh
-opkg install ./luci-app-wechatpush_3.6.20-2_all.ipk
+opkg install ./luci-app-wechatpush_3.6.20-3_all.ipk
 ```
 
 可选依赖：

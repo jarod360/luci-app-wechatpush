@@ -44,11 +44,11 @@ flag.onchange(null, 'config', '1');
 modal[5].children[0].attrs.click();
 assert.equal(flag.value, '0');
 
-let enabled = false, reads = 0, cacheData = {}, aliasData = '', deferred;
+let enabled = false, reads = 0, cacheData = {}, aliasData = '', hostHints = {}, localDevices = {}, deferred;
 const badgeSource = fs.readFileSync(path.join(root, 'htdocs/luci-static/resources/wechatpush/tplink.js'), 'utf8');
-const helper = new Function('baseclass','fs','uci','L','E','ui', badgeSource)(
-    {extend: value => value}, {read(file) { reads++; if (file.endsWith('device_aliases.list')) return Promise.resolve(aliasData); return deferred ? new Promise(resolve => { deferred.resolve=resolve; }) : Promise.resolve(JSON.stringify(cacheData)); }},
-    {get() { return enabled ? '1' : '0'; }}, {resolveDefault: (promise, fallback) => promise.catch(() => fallback)}, E, ui);
+const helper = new Function('baseclass','fs','uci','L','E','ui','rpc', badgeSource)(
+    {extend: value => value}, {read(file) { reads++; if (file.endsWith('device_aliases.list')) return Promise.resolve(aliasData); if (file.endsWith('/devices.json')) return Promise.resolve(JSON.stringify(localDevices)); return deferred ? new Promise(resolve => { deferred.resolve=resolve; }) : Promise.resolve(JSON.stringify(cacheData)); }},
+    {get() { return enabled ? '1' : '0'; }}, {resolveDefault: (promise, fallback) => promise.catch(() => fallback)}, E, ui, {declare: () => () => Promise.resolve(hostHints)});
 (async () => {
     assert.equal(await helper.read(), null);
     assert.equal(reads, 0);
@@ -76,13 +76,19 @@ const helper = new Function('baseclass','fs','uci','L','E','ui', badgeSource)(
     cacheData={state:'connected',updated_at:Date.now()/1000,online:3,online_clients:[
         {name:'anonymous',mac:'aa:bb:cc:dd:ee:ff',ip:'192.0.2.1',ap:'AP-A',ssid:'test'},
         {name:'anonymous',mac:'11:22:33:44:55:66',ip:'192.0.2.2',ap:'AP-B'},
-        {name:'anonymous',mac:'22:33:44:55:66:77',ip:'192.0.2.3'}]};
+        {name:'anonymous',mac:'22:33:44:55:66:77',ip:'192.0.2.3'},
+        {name:'unknown',mac:'33:44:55:66:77:88',ip:'192.0.2.4'},
+        {name:'unknown',mac:'44:55:66:77:88:99',ip:'192.0.2.5'}]};
     aliasData='192.0.2.1 IP fallback\nAA-BB-CC-DD-EE-FF 手机 100% "别名"\n192.0.2.2 IP alias\n';
+    hostHints={'22:33:44:55:66:77':{name:'iQOO15',ipaddrs:['192.0.2.3']}};
+    localDevices={devices:[{mac:'33:44:55:66:77:88',ip:'192.0.2.4',name:'本机设备名'}]};
     await helper.showClients();
     const table=modal[2].children[0];
     assert.equal(table.children[1].children[0].children, '手机 100% "别名"');
     assert.equal(table.children[2].children[0].children, 'IP alias');
-    assert.equal(table.children[3].children[0].children, '未命名');
+    assert.equal(table.children[3].children[0].children, 'iQOO15');
+    assert.equal(table.children[4].children[0].children, '本机设备名');
+    assert.equal(table.children[5].children[0].children, '未命名');
     assert.ok(modal[0].children.includes('@media(max-width:767px)'));
     deferred={};
     const pending=helper.showClients();

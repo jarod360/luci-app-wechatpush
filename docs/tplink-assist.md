@@ -9,7 +9,7 @@
 
 绿色按钮显示“无线客户端在线 N”，点击打开“TP-LINK 在线客户端”弹窗。
 桌面显示名称、IP、MAC、AP、SSID；767px 及以下只显示名称、IP、AP。
-名称按 WeChatPush MAC 别名、IP 别名、TP-LINK 名称、未命名的顺序选择。
+名称按 WeChatPush MAC 别名、IP 别名、QWRT 主机名、主设备表名称、TP-LINK 名称、未命名的顺序选择。
 不会修改 TP-LINK 设备备注。刷新只读现有缓存，不发起额外登录。
 红色表示连接、凭据、配置、日志或缓存有效性异常；橙色表示返回格式不适配。
 
@@ -71,6 +71,7 @@ bash tests/test_tplink_down.sh
 bash tests/test_device_aliases.sh
 bash tests/test_utf8.sh
 bash tests/test_template_utf8.sh
+bash tests/test_push_concurrency.sh
 ```
 
 Shell 测试提取函数到临时目录，使用假设备记录；企业微信模板测试替换网络及发送函数，只生成 JSON。

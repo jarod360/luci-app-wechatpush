@@ -3,8 +3,10 @@
 'require fs';
 'require uci';
 'require ui';
+'require rpc';
 
 return baseclass.extend({
+	callHostHints: rpc.declare({ object: 'luci-rpc', method: 'getHostHints', expect: { '': {} } }),
 	read: function () {
 		if (uci.get('wechatpush', 'config', 'tplink_enable') !== '1')
 			return Promise.resolve(null);
@@ -16,7 +18,7 @@ return baseclass.extend({
 		var self = this, requestId = this._clientRequest = (this._clientRequest || 0) + 1;
 		var close = function () { self._clientRequest++; ui.hideModal(); };
 		ui.showModal('TP-LINK 在线客户端', [E('p', '正在读取客户端列表…'), E('div', { 'class': 'right' }, [E('button', { 'type': 'button', 'class': 'btn', 'click': close }, '关闭')])]);
-		return Promise.all([this.read(), L.resolveDefault(fs.read('/usr/share/wechatpush/api/device_aliases.list'), '')]).then(function (result) {
+		return Promise.all([this.read(), L.resolveDefault(fs.read('/usr/share/wechatpush/api/device_aliases.list'), ''), L.resolveDefault(this.callHostHints(), {}), L.resolveDefault(fs.read('/tmp/wechatpush/devices.json'), '{}')]).then(function (result) {
 			if (requestId !== self._clientRequest) return;
 			var data = result[0], aliases = Object.create(null);
 			String(result[1]).split(/\r?\n/).forEach(function (line) {
@@ -26,6 +28,22 @@ return baseclass.extend({
 					if (!aliases[key]) aliases[key] = match[2].trim();
 				}
 			});
+			var hostNames = Object.create(null), deviceNames = Object.create(null);
+			var usefulName = function (value) {
+				return typeof value === 'string' && value.trim() && !/^(anonymous|unknown|未命名|未知|\*)$/i.test(value.trim()) ? value.trim() : '';
+			};
+			var remember = function (map, mac, ips, name) {
+				name = usefulName(name); if (!name) return;
+				if (mac) map[String(mac).toLowerCase().replace(/-/g, ':')] = name;
+				(Array.isArray(ips) ? ips : []).forEach(function (ip) { if (!map[ip]) map[ip] = name; });
+			};
+			Object.keys(result[2] || {}).forEach(function (mac) {
+				var hint = result[2][mac] || {}; remember(hostNames, mac, hint.ipaddrs, hint.name || hint.hostname);
+			});
+			try {
+				var localDevices = JSON.parse(result[3]).devices;
+				(Array.isArray(localDevices) ? localDevices : []).forEach(function (row) { if (row) remember(deviceNames, row.mac, [row.ip], row.name); });
+			} catch (e) {}
 			var fresh = data && data.state === 'connected' && typeof data.updated_at === 'number' &&
 				Date.now() / 1000 >= data.updated_at && Date.now() / 1000 - data.updated_at <= 30;
 			var rows = data && Array.isArray(data.online_clients) ? data.online_clients.filter(function (row) { return row && typeof row === 'object'; }) : [];
@@ -34,8 +52,10 @@ return baseclass.extend({
 			rows.forEach(function (row) {
 				table.appendChild(E('tr', {}, ['name', 'ip', 'mac', 'ap', 'ssid'].map(function (key) {
 					var value = typeof row[key] === 'string' && row[key] ? row[key] : '—';
-					if (key === 'name') value = aliases[String(row.mac || '').toLowerCase().replace(/-/g, ':')] || aliases[row.ip] || value;
-					if (key === 'name' && (value === '—' || value.toLowerCase() === 'anonymous')) value = '未命名';
+					if (key === 'name') {
+						var mac = String(row.mac || '').toLowerCase().replace(/-/g, ':');
+						value = aliases[mac] || aliases[row.ip] || hostNames[mac] || hostNames[row.ip] || deviceNames[mac] || deviceNames[row.ip] || usefulName(row.name) || '未命名';
+					}
 					return E('td', { 'style': 'padding:10px 8px;border-bottom:1px solid #ddd' }, value);
 				})));
 			});

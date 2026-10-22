@@ -3762,12 +3762,39 @@ diy_send() {
 	if [[ "${3}" == *"/qywx_mpnews.json" ]]; then
 		qywx_media_id=$(qywx_upload_media "$mediapath") || return 1
 	fi
+	# A send can overlap device events, login alerts or scheduled pushes.
+	# Never share the main loop's temp.json (which deltemp may remove).
+	local tempjsonpath
+	tempjsonpath=$(mktemp "${dir}/push.XXXXXX") || {
+		log_change "[ERROR] Failed to create private push payload"
+		return 1
+	}
 	local diyurl=$(jq -r .url "${3}") && local diyurl=$(eval echo "${diyurl}")
 	local type=$(jq -r '.type' ${3}) && local type=$(eval echo ${type})
 	local data=$(jq -r '.data' ${3}) && local data=$(eval echo ${data})
 	local content_type=$(jq -r '.content_type' ${3})
 
-	! jq "$type" ${3} >${tempjsonpath} && log_change "[ERROR] $(translate "type:{ } field format error after variable substitution, please check for unescaped special characters or syntax errors in type:{ } field")" && return 1
+	local json_encoding=()
+	# ASCII JSON escapes preserve Unicode while avoiding intermediary byte decoding.
+	[[ "${3}" == *"/qywx_mpnews.json" || "${3}" == *"/qywx_markdown.json" ]] && json_encoding=(-a)
+	if ! jq "${json_encoding[@]}" "$type" "$3" >"$tempjsonpath"; then
+		log_change "[ERROR] $(translate "type:{ } field format error after variable substitution, please check for unescaped special characters or syntax errors in type:{ } field")"
+		rm -f "$tempjsonpath"
+		return 1
+	fi
+	# Keep only the latest offline payload for local diagnosis; never save tokens/URLs.
+	if [ "${offline_push_pending:-0}" = 1 ] && [ "${#json_encoding[@]}" -gt 0 ]; then
+		if jq -e '.. | strings | select(index("\ufffd"))' "$tempjsonpath" >/dev/null 2>&1; then
+			log_change "[WARN] 离线通知生成时已包含 Unicode 替换字符，请检查本地 push_diagnostics 快照"
+		fi
+		local diagnostics="${dir}/push_diagnostics"
+		if mkdir -p -m 700 "$diagnostics"; then
+			(umask 077; printf '%s' "$1" >"$diagnostics/title.txt";
+			 printf '%s' "$2" >"$diagnostics/body.html";
+			 cp "$tempjsonpath" "$diagnostics/payload.json";
+			 date '+%Y-%m-%d %H:%M:%S' >"$diagnostics/prepared_at")
+		fi
+	fi
 
 	if [[ "$diyurl" =~ ^https?:// ]]; then
 		local curl_response
@@ -3801,8 +3828,9 @@ diy_send() {
 		log_change "[DEBUG] $(translate "Push content preview saved to: %s" "${dir}/debug_send_content")"
 		log_change "[DEBUG] $(translate "If no message received, please check %s or use the following command to test manually" "${dir}/debug_send_data")"
 		log_change "[DEBUG] curl -X POST -H \"$content_type\" -d \"@${dir}/debug_send_data\" \"${diyurl}\""
-		[ $RETVAL -ne 0 ] && return 1
+		[ $RETVAL -ne 0 ] && { rm -f "$tempjsonpath"; return 1; }
 	fi
+	rm -f "$tempjsonpath"
 	return 0
 }
 
