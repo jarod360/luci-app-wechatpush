@@ -21,7 +21,8 @@ const ui = { showModal(title, body) { modal = body; }, hideModal() { closed++; }
 const config = fs.readFileSync(path.join(root, 'htdocs/luci-static/resources/view/wechatpush/config.js'), 'utf8');
 const block = config.slice(config.indexOf('var configView ='), config.indexOf("o = s.taboption('basic', form.Flag, 'prefer_client_page'"));
 let applied = 0;
-new Function('s','form','m','ui','E', block).call({handleSaveApply() { applied++; return Promise.resolve(); }},section, {Flag:0,Value:1}, {checkDepends() {}}, ui, E);
+const helpFunction = config.slice(config.indexOf('function formatHelp('), config.indexOf('return view.extend({'));
+new Function('s','form','m','ui','E', helpFunction + block).call({handleSaveApply() { applied++; return Promise.resolve(); }},section, {Flag:0,Value:1}, {checkDepends() {}}, ui, E);
 const flag = options.tplink_enable;
 assert.equal(flag.default, '0');
 assert.equal(options.tplink_password.password, true);

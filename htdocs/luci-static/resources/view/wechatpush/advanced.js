@@ -7,6 +7,10 @@
 'require form';
 'require poll';
 
+function formatHelp(text) {
+	return '<div style="max-width:52em;white-space:normal;overflow-wrap:anywhere">' + text + '</div>';
+}
+
 return view.extend({
 	callHostHints: rpc.declare({
 		object: 'luci-rpc',
@@ -159,7 +163,7 @@ return view.extend({
 		o = s.option(form.Flag, "only_timeout_push", _("Offline timeout applies only to the devices that receive push notifications"))
 		o.default = 0
 		o.rmempty = true
-		o.description = _("When disabled, all devices use the custom timeout and detection count. When enabled, the original MAC filtering and push eligibility logic determines which devices use custom settings, unless Offline custom detection is selected; then only devices in its MAC list use custom settings and all others use the default values (10 seconds and 2 checks). This setting never changes push eligibility.")
+		o.description = formatHelp(_("When disabled, all devices use the custom timeout and detection count.<br/>When enabled, the original MAC filtering and push eligibility logic determines which devices use custom settings.<br/>If Offline custom detection is selected, only devices in its MAC list use custom settings and all others use the default values (10 seconds and 2 checks).<br/>This setting never changes push eligibility."));
 		o.depends('passive_mode', '0');
 
 		o = s.option(form.DynamicList, 'always_check_ip_list', _('IP address to always scan'));

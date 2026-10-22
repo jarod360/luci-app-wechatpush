@@ -74,6 +74,10 @@ var cbiRichListValue = form.ListValue.extend({
 	}
 });
 
+function formatHelp(text) {
+	return '<div style="max-width:52em;white-space:normal;overflow-wrap:anywhere">' + text + '</div>';
+}
+
 return view.extend({
 	callHostHints: rpc.declare({
 		object: 'luci-rpc',
@@ -209,7 +213,7 @@ return view.extend({
 		o = s.taboption('basic', form.Value, 'qywx_api_url', _('WeChat Work API Base URL'));
 		o.placeholder = 'https://qyapi.weixin.qq.com';
 		o.rmempty = true;
-		o.description = _('Optional API proxy base URL. Leave empty to use the official WeChat Work API. Enter only the base URL, without /cgi-bin/...');
+		o.description = formatHelp(_('Optional API proxy base URL. Leave empty to use the official WeChat Work API. Enter only the base URL, without /cgi-bin/...'));
 		o.depends('jsonpath', '/usr/share/wechatpush/api/qywx_mpnews.json');
 		o.depends('jsonpath', '/usr/share/wechatpush/api/qywx_markdown.json');
 
@@ -318,7 +322,7 @@ return view.extend({
 		o.depends('jsonpath', '/usr/share/wechatpush/api/diy.json');
 
 		o = s.taboption('basic', form.Value, 'proxy_address', _('Proxy Address'));
-		o.description = _('Optional HTTP/SOCKS forward proxy for push requests. For WeChat Work, this proxy is used for access-token retrieval, media upload and message delivery. The public egress IP must also be allowed in the WeChat Work administrator console when IP allowlisting is enabled.<br/>Example:<br/>http://username:password@127.0.0.1:1080<br/>socks5://username:password@127.0.0.1:1080');
+		o.description = formatHelp(_('Optional HTTP/SOCKS forward proxy for push requests. For WeChat Work, this proxy is used for access-token retrieval, media upload and message delivery. The public egress IP must also be allowed in the WeChat Work administrator console when IP allowlisting is enabled.<br/>Example:<br/>http://username:password@127.0.0.1:1080<br/>socks5://username:password@127.0.0.1:1080'));
 		o.depends('jsonpath', '/usr/share/wechatpush/api/serverchan.json');
 		o.depends('jsonpath', '/usr/share/wechatpush/api/serverchan3.json');
 		o.depends('jsonpath', '/usr/share/wechatpush/api/wxpusher.json');
@@ -368,7 +372,7 @@ return view.extend({
 		o.default = '/etc/config/lucky.daji/ipdb/ip2region_v4.xdb';
 		o.placeholder = '/etc/config/lucky.daji/ipdb/ip2region_v4.xdb';
 		o.rmempty = true;
-		o.description = _('选择本地数据库后，针对 Web 和 SSH 登录 IP 地址，优先使用本地 ip2region 数据库查询。本地数据库没有有效结果时，按照程序内置网址逐个查询。IPv6 地址始终使用在线查询。');
+		o.description = formatHelp(_('选择本地数据库后，针对 Web 和 SSH 登录 IP 地址，优先使用本地 ip2region 数据库查询。本地数据库没有有效结果时，按照程序内置网址逐个查询。IPv6 地址始终使用在线查询。'));
 
 		o = s.taboption('basic', cbiRichListValue, 'oui_data', _('MAC Device Database'));
 		o.value('', _('Close'),
@@ -400,16 +404,16 @@ return view.extend({
 
 		o = s.taboption('basic', form.Flag, 'qwrt_traffic_enable', _('QWRT native traffic statistics'));
 		o.default = '0';
-		o.description = _('仅适用于 QWRT 2026.10.6 及以上版本。启用后使用 QWRT 原生的累计流量检测。在线设备页面、推送、异常流量告警和无人值守低流量判断均依据此；关闭时不显示设备流量。');
+		o.description = formatHelp(_('仅适用于 QWRT 2026.10.6 及以上版本。启用后使用 QWRT 原生的累计流量检测。在线设备页面、推送、异常流量告警和无人值守低流量判断均依据此；关闭时不显示设备流量。'));
 
 		o = s.taboption('basic', form.Flag, 'qwrt_online_enable', _('QWRT native online detection'));
 		o.default = '0';
-		o.description = '仅适用于 QWRT 2026.10.6 及以上版本。启用后使用 QWRT 原生的 ARP/MAC 规则检测。不使用 ping/arping 主动探测；关闭时保持原有检测逻辑。';
+		o.description = formatHelp('仅适用于 QWRT 2026.10.6 及以上版本。启用后使用 QWRT 原生的 ARP/MAC 规则检测。不使用 ping/arping 主动探测；关闭时保持原有检测逻辑。');
 
 		var configView = this;
 		var tplinkFlag = s.taboption('basic', form.Flag, 'tplink_enable', 'TP-LINK 路由器辅助检测');
 		tplinkFlag.default = '0';
-		tplinkFlag.description = '无线设备由 TP-LINK 确认断开满 30 秒且未恢复后推送，不再等待原检测超时；有线设备保持原检测。连接异常或数据过期时暂缓无线离线判断。点击在线数量可查看客户端明细。';
+		tplinkFlag.description = formatHelp('无线设备由 TP-LINK 确认断开满 30 秒且未恢复后推送，不再等待原检测超时；有线设备保持原检测。连接异常或数据过期时暂缓无线离线判断。点击在线数量可查看客户端明细。');
 		var tplinkStatus = s.taboption('basic', form.DummyValue, '_tplink_status', 'TP-LINK 连接状态');
 		tplinkStatus.depends('tplink_enable', '1');
 		tplinkStatus.renderWidget = function () {
@@ -620,7 +624,7 @@ return view.extend({
 		o.description = _('Send notification after exceeding the count, and optionally auto-ban IP');
 
 		o = s.taboption('content', form.Flag, 'client_usage', _('Device abnormal traffic alert'));
-		o.description = _('使用 QWRT 原生累计流量统计每分钟流量增量，需先启用基础设置中的 QWRT 原生流量统计。');
+		o.description = formatHelp(_('使用 QWRT 原生累计流量统计每分钟流量增量，需先启用基础设置中的 QWRT 原生流量统计。'));
 		o.default = '0';
 		o.depends('qwrt_traffic_enable', '1');
 

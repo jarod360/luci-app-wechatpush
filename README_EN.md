@@ -101,7 +101,7 @@ To install a package built by this repository's GitHub Actions, download the mat
 opkg install ./luci-app-wechatpush_3.6.20_all.ipk
 ```
 
-The older SDK records the IPK package version as `3.6.20`. If an earlier revision of that version is already installed, use `opkg --force-reinstall install ./luci-app-wechatpush_3.6.20_all.ipk` for r4 and update the matching language package. APK builds carry the separate `-r4` revision.
+The older SDK records the IPK package version as `3.6.20`. If an earlier revision of that version is already installed, use `opkg --force-reinstall install ./luci-app-wechatpush_3.6.20_all.ipk` for r5 and update the matching language package. APK builds carry the separate `-r5` revision.
 
 Optional dependencies:
 
@@ -138,3 +138,5 @@ Also include relevant log or debug files from `/tmp/wechatpush/`. Do not post We
 Licensed under GPL-2.0.
 
 Revision **r4** hides the trailing `.lan` suffix (case-insensitive) in automatically detected TP-LINK client display names. Custom aliases remain unchanged.
+
+Revision **r5** standardizes help-text width and wrapping for fork additions while preserving theme form alignment and typography.
