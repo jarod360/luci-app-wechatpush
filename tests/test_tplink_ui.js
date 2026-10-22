@@ -80,7 +80,7 @@ const helper = new Function('baseclass','fs','uci','L','E','ui','rpc', badgeSour
         {name:'unknown',mac:'33:44:55:66:77:88',ip:'192.0.2.4'},
         {name:'unknown',mac:'44:55:66:77:88:99',ip:'192.0.2.5'}]};
     aliasData='192.0.2.1 IP fallback\nAA-BB-CC-DD-EE-FF 手机 100% "别名"\n192.0.2.2 IP alias\n';
-    hostHints={'22:33:44:55:66:77':{name:'iQOO15',ipaddrs:['192.0.2.3']}};
+    hostHints={'22:33:44:55:66:77':{name:'iQOO15.lan',ipaddrs:['192.0.2.3']}};
     localDevices={devices:[{mac:'33:44:55:66:77:88',ip:'192.0.2.4',name:'本机设备名'}]};
     await helper.showClients();
     const table=modal[2].children[0];

@@ -54,7 +54,7 @@ return baseclass.extend({
 					var value = typeof row[key] === 'string' && row[key] ? row[key] : '—';
 					if (key === 'name') {
 						var mac = String(row.mac || '').toLowerCase().replace(/-/g, ':');
-						value = aliases[mac] || aliases[row.ip] || hostNames[mac] || hostNames[row.ip] || deviceNames[mac] || deviceNames[row.ip] || usefulName(row.name) || '未命名';
+						value = aliases[mac] || aliases[row.ip] || (hostNames[mac] || hostNames[row.ip] || deviceNames[mac] || deviceNames[row.ip] || usefulName(row.name)).replace(/\.lan$/i, '') || '未命名';
 					}
 					return E('td', { 'style': 'padding:10px 8px;border-bottom:1px solid #ddd' }, value);
 				})));
