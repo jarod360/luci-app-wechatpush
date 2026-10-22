@@ -15,9 +15,77 @@ env:
 permissions:
   contents: write
 
+concurrency:
+  group: wechatpush-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  stop-stale-builds:
+    name: Stop superseded builds
+    if: >-
+      github.event_name == 'push' && github.ref == 'refs/heads/master' && !startsWith(github.event.head_commit.message, 'maintenance: cleanup workflow history')
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const current = Number(process.env.GITHUB_RUN_ID);
+            const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+              ...context.repo, workflow_id: 'build.yml', branch: 'master', per_page: 100
+            });
+            for (const run of runs) {
+              if (run.id < current && run.status !== 'completed') {
+                await github.rest.actions.cancelWorkflowRun({ ...context.repo, run_id: run.id });
+                core.info(`Cancelled superseded run ${run.id}`);
+              }
+            }
+
+  cleanup-history:
+    name: Keep only the latest workflow run
+    if: >-
+      github.event_name == 'push' && startsWith(github.event.head_commit.message, 'maintenance: cleanup workflow history')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Delete older completed workflow runs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const keep = Number(process.env.GITHUB_RUN_ID);
+            const runs = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, {
+              ...context.repo, per_page: 100
+            });
+            runs.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at) || b.id - a.id);
+            if (!runs.length || runs[0].id !== keep)
+              throw new Error('A newer run exists; no history was deleted.');
+            const older = runs.filter(run => run.id !== keep);
+            if (older.some(run => run.status !== 'completed'))
+              throw new Error('An older run is still active; no history was deleted.');
+            core.info(`Preserving current latest run ${keep}; deleting ${older.length} older runs.`);
+            let removed = 0;
+            for (const run of older) {
+              await github.rest.actions.deleteWorkflowRun({ ...context.repo, run_id: run.id });
+              removed++;
+              if (removed % 20 === 0) core.info(`Deleted ${removed}/${older.length}`);
+            }
+            const remaining = await github.rest.actions.listWorkflowRunsForRepo({ ...context.repo, per_page: 100 });
+            if (remaining.data.total_count !== 1 || remaining.data.workflow_runs[0].id !== keep)
+              throw new Error('Unexpected remaining runs; review concurrent activity.');
+            await core.summary.addHeading('Workflow history cleaned')
+              .addRaw(`Deleted ${removed} older runs. Retained latest run ${keep}. Release assets are unchanged.`)
+              .write();
+
   validate:
     name: Validate source and presence logic
+    if: >-
+      github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'maintenance: cleanup workflow history')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,8 +97,8 @@ jobs:
           node-version: '22'
       - name: Install test dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y lua5.1 jq locales
+          timeout 120s sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 update || echo "Some package indexes unavailable; using existing indexes"
+          timeout 150s sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 install --no-install-recommends -y lua5.1 jq locales
           sudo locale-gen en_US.UTF-8
           python -m pip install 'lupa==2.8'
       - name: Check all scripts and templates
@@ -53,6 +121,7 @@ jobs:
 
   build-apk:
     name: Build APK (v25.12)
+    timeout-minutes: 25
     needs: validate
     runs-on: ubuntu-latest
     env:
@@ -69,9 +138,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install dependencies
+        timeout-minutes: 5
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential rsync unzip zstd lua5.1 python3 python3-pyelftools
+          timeout 120s sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 update || echo "Some package indexes unavailable; using existing indexes"
+          timeout 150s sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 install --no-install-recommends -y build-essential rsync unzip zstd lua5.1 python3 python3-pyelftools
 
       - name: Cache OpenWrt SDK
         id: cache-sdk
@@ -164,8 +234,8 @@ jobs:
           mkdir -p ./package/${PACKAGE_NAME}
           rsync -a --delete "$pkg_src"/ ./package/${PACKAGE_NAME}/
           
-          # 注意：wrtbwmon 在 OpenWrt 22+ (firewall4/nftables) 环境下不兼容
-          # 流量统计功能在新版本中不可用，但保留其他功能
+          # Legacy third-party traffic monitoring was removed.
+          # Optional QWRT-native statistics are configured at runtime.
           
           translation_pkg=${PACKAGE_NAME#luci-app-}
           mkdir -p ./bin/packages
@@ -173,11 +243,8 @@ jobs:
           find ./bin/packages -type f -name "luci-i18n-${translation_pkg}-*.apk" -delete
           {
             echo "CONFIG_PACKAGE_${PACKAGE_NAME}=m"
-            # 注意：流量监控功能在 OpenWrt 22+ 中不可用（wrtbwmon 与 firewall4 不兼容）
-            # echo "CONFIG_PACKAGE_${PACKAGE_NAME}_Enable_Traffic_Monitoring=y"
             echo "CONFIG_PACKAGE_${PACKAGE_NAME}_Enable_Local_Disk_Information_Detection=y"
             echo "CONFIG_PACKAGE_${PACKAGE_NAME}_Enable_Host_Information_Detection=y"
-            # echo "CONFIG_PACKAGE_wrtbwmon=m"  # 在 firewall4 环境下不兼容
             echo "CONFIG_PACKAGE_lsblk=m"
             echo "CONFIG_PACKAGE_smartmontools=m"
             echo "CONFIG_PACKAGE_smartmontools-drivedb=m"
@@ -222,6 +289,7 @@ jobs:
 
   build-ipk:
     name: Build IPK (v23.05)
+    timeout-minutes: 25
     needs: validate
     runs-on: ubuntu-latest
     env:
@@ -238,9 +306,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install dependencies
+        timeout-minutes: 5
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential rsync unzip zstd lua5.1 python3
+          timeout 120s sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 update || echo "Some package indexes unavailable; using existing indexes"
+          timeout 150s sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 install --no-install-recommends -y build-essential rsync unzip zstd lua5.1 python3
 
       - name: Cache OpenWrt SDK
         id: cache-sdk
