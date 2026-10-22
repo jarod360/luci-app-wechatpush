@@ -86,7 +86,7 @@ msgstr "使用企业微信应用推送消息，请使用稳定的企业微信代
 
 #: applications/luci-app-wechatpush/htdocs/luci-static/resources/view/wechatpush/config.js:139
 msgid "WeChat Work Text Version"
-msgstr "企业微信纯文字版"
+msgstr "企业微信 纯文字版"
 
 #: applications/luci-app-wechatpush/htdocs/luci-static/resources/view/wechatpush/config.js:140
 msgid "WeCom application plain text push messages can be viewed directly in WeChat and WeCom clients; other settings are the same as above"

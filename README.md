@@ -123,7 +123,7 @@
 opkg install ./luci-app-wechatpush_3.6.20_all.ipk
 ```
 
-旧版 SDK 生成的 IPK 包内版本仍为 `3.6.20`。若已安装同版本的早期修订，更新 r5 时请使用 `opkg --force-reinstall install ./luci-app-wechatpush_3.6.20_all.ipk`，并更新对应中文语言包。APK 产物包含独立的 `-r5` 修订号。
+旧版 SDK 生成的 IPK 包内版本仍为 `3.6.20`。若已安装同版本的早期修订，更新 r6 时请使用 `opkg --force-reinstall install ./luci-app-wechatpush_3.6.20_all.ipk`，并更新对应中文语言包。APK 产物包含独立的 `-r6` 修订号。
 
 可选依赖：
 
