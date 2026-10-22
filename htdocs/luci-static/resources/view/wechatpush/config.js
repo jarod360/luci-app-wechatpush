@@ -5,6 +5,7 @@
 'require uci';
 'require rpc';
 'require form';
+'require wechatpush.tplink as tplink';
 
 'require poll';
 'require tools.widgets as widgets';
@@ -81,9 +82,10 @@ return view.extend({
 	}),
 
 	load: function () {
-		return Promise.all([
-			this.callHostHints()
-		]);
+		var self = this;
+		return uci.load('wechatpush').then(function () {
+			return Promise.all([self.callHostHints(), tplink.read()]);
+		});
 	},
 
 	render: function (data) {
@@ -105,8 +107,10 @@ return view.extend({
 		s.render = function () {
 			var statusView = E('p', { id: 'service_status' }, _('Collecting data ...'));
 			poll.add(function () {
-				return L.resolveDefault(getServiceStatus()).then(function (res) {
-					statusView.innerHTML = renderStatus(res);
+				return Promise.all([L.resolveDefault(getServiceStatus()), tplink.read()]).then(function (res) {
+					statusView.innerHTML = renderStatus(res[0]);
+					var inlineStatus = document.getElementById('tplink_connection_status');
+					if (inlineStatus && res[1]) inlineStatus.replaceChildren(tplink.badge(res[1]));
 				});
 			});
 
@@ -139,9 +143,9 @@ return view.extend({
 		o.value('/usr/share/wechatpush/api/serverchan3.json', _('Serverchan3 APP'),
 			_('Using serverchan3 API, simple configuration, support push to ServerChan App'));
 		o.value('/usr/share/wechatpush/api/qywx_mpnews.json', _('WeChat Work Image Message'),
-			_('Using WeChat Work application message, more complex configuration, and starting from June 20, 2022, additional configuration for trusted IP is required. Trusted IP cannot be shared. This channel is no longer recommended.'));
+			_('To send messages using a WeCom application, use a stable WeCom API proxy and add the IP address of that proxy API to the trusted IP list of your WeCom application.'));
 		o.value('/usr/share/wechatpush/api/qywx_markdown.json', _('WeChat Work Text Version'),
-			_('WeChat Work application text message, not Markdown; can be displayed as a normal text message in WeChat and WeCom, same as above'));
+			_('WeCom application plain text push messages can be viewed directly in WeChat and WeCom clients; other settings are the same as above'));
 		o.value('/usr/share/wechatpush/api/wxpusher.json', _('wxpusher'),
 			_('Another channel for WeChat push, the configuration is relatively simple, and only supports official accounts'));
 		o.value('/usr/share/wechatpush/api/pushplus.json', _('pushplus'),
@@ -401,6 +405,63 @@ return view.extend({
 		o = s.taboption('basic', form.Flag, 'qwrt_online_enable', _('QWRT native online detection'));
 		o.default = '0';
 		o.description = '仅适用于 QWRT 2026.10.6 及以上版本。启用后使用 QWRT 原生的 ARP/MAC 规则检测。不使用 ping/arping 主动探测；关闭时保持原有检测逻辑。';
+
+		var configView = this;
+		var tplinkFlag = s.taboption('basic', form.Flag, 'tplink_enable', 'TP-LINK 路由器辅助检测');
+		tplinkFlag.default = '0';
+		tplinkFlag.description = '无线设备由 TP-LINK 确认断开满 30 秒且未恢复后推送，不再等待原检测超时；有线设备保持原检测。连接异常或数据过期时暂缓无线离线判断。点击在线数量可查看客户端明细。';
+		var tplinkStatus = s.taboption('basic', form.DummyValue, '_tplink_status', 'TP-LINK 连接状态');
+		tplinkStatus.depends('tplink_enable', '1');
+		tplinkStatus.renderWidget = function () {
+			return E('span', { 'id': 'tplink_connection_status' }, tplink.badge(data[1] || { state: 'waiting' }));
+		};
+		var tplinkHost = s.taboption('basic', form.Value, 'tplink_host', 'TP-LINK 管理地址');
+		tplinkHost.default = '192.168.0.1';
+		tplinkHost.datatype = 'ip4addr';
+		tplinkHost.rmempty = false;
+		tplinkHost.retain = true;
+		tplinkHost.depends('tplink_enable', '1');
+		var tplinkUser = s.taboption('basic', form.Value, 'tplink_username', 'TP-LINK 用户名');
+		tplinkUser.rmempty = false;
+		tplinkUser.retain = true;
+		tplinkUser.depends('tplink_enable', '1');
+		var tplinkPassword = s.taboption('basic', form.Value, 'tplink_password', 'TP-LINK 密码');
+		tplinkPassword.password = true;
+		tplinkPassword.rmempty = false;
+		tplinkPassword.retain = true;
+		tplinkPassword.depends('tplink_enable', '1');
+		tplinkFlag.onchange = function (event, sectionId, value) {
+			if (value !== '1' && value !== true) return;
+			var fields = [tplinkHost, tplinkUser, tplinkPassword];
+			var labels = ['管理地址（IPv4）', '用户名', '密码'];
+			var inputs = fields.map(function (field, index) {
+				return E('input', { 'class': 'cbi-input-text', 'type': index === 2 ? 'password' : 'text',
+					'autocomplete': 'off', 'value': field.formvalue(sectionId) || field.cfgvalue(sectionId) || field.default || '' });
+			});
+			var error = E('p', { 'style': 'color:red' });
+			ui.showModal('TP-LINK 辅助检测', fields.map(function (field, index) {
+				return E('p', [E('label', labels[index]), E('br'), inputs[index]]);
+			}).concat([
+				E('p', '使用本地管理账号。点击“保存并应用”后开始检测，通常在 10 秒内显示连接状态。本功能可能使浏览器中的路由器管理会话退出。'), error,
+				E('div', { 'class': 'right' }, [
+					E('button', { 'class': 'btn', 'click': function () {
+						tplinkFlag.getUIElement(sectionId).setValue('0');
+						m.checkDepends();
+						ui.hideModal();
+					} }, '取消'), ' ',
+					E('button', { 'type': 'button', 'class': 'btn cbi-button-positive', 'click': function (event) {
+						var parts = inputs[0].value.split('.');
+						if (parts.length !== 4 || !parts.every(function (part) { return /^\d{1,3}$/.test(part) && Number(part) <= 255; }) ||
+							!inputs[1].value.trim() || !inputs[2].value) {
+							error.textContent = '请填写有效的 IPv4 地址、用户名和密码。'; return;
+						}
+						fields.forEach(function (field, index) { field.getUIElement(sectionId).setValue(inputs[index].value); });
+						ui.hideModal();
+						return configView.handleSaveApply(event);
+					} }, '保存并应用')
+				])
+			]));
+		};
 
 		o = s.taboption('basic', form.Flag, 'prefer_client_page', _('Prefer displaying online devices'));
 		o.default = '1';

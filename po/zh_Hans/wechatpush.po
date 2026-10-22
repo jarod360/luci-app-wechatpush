@@ -81,16 +81,16 @@ msgid "WeChat Work Image Message"
 msgstr "企业微信 图文消息"
 
 #: applications/luci-app-wechatpush/htdocs/luci-static/resources/view/wechatpush/config.js:138
-msgid "Using WeChat Work application message, more complex configuration, and starting from June 20, 2022, additional configuration for trusted IP is required. Trusted IP cannot be shared. This channel is no longer recommended."
-msgstr "使用 企业微信应用消息，配置较为麻烦，且 2022 年 6 月 20 日之后新创建的应用，需要额外配置可信 IP，可信 IP 不可公用，不再推荐此通道"
+msgid "To send messages using a WeCom application, use a stable WeCom API proxy and add the IP address of that proxy API to the trusted IP list of your WeCom application."
+msgstr "使用企业微信应用推送消息，请使用稳定的企业微信代理，并在企业微信应用的可信IP里配置该代理API的IP地址。"
 
 #: applications/luci-app-wechatpush/htdocs/luci-static/resources/view/wechatpush/config.js:139
 msgid "WeChat Work Text Version"
 msgstr "企业微信纯文字版"
 
 #: applications/luci-app-wechatpush/htdocs/luci-static/resources/view/wechatpush/config.js:140
-msgid "WeChat Work application text message, not Markdown; can be displayed as a normal text message in WeChat and WeCom, same as above"
-msgstr "企业微信应用纯文本消息，不使用 Markdown，可在微信和企业微信客户端直接查看，其他配置同上"
+msgid "WeCom application plain text push messages can be viewed directly in WeChat and WeCom clients; other settings are the same as above"
+msgstr "企业微信应用纯文本推送消息，可在微信和企业微信客户端直接查看，其他配置同上"
 
 #: applications/luci-app-wechatpush/htdocs/luci-static/resources/view/wechatpush/config.js:142
 msgid "Another channel for WeChat push, the configuration is relatively simple, and only supports official accounts"

@@ -43,7 +43,7 @@ wait_and_cat() {
 # 初始化设置信息
 read_config() {
 	get_config \
-		"ip2region_db_path" "enable" "lite_enable" "device_name" "proxy_address" "qywx_api_url" "sleeptime" "oui_data" "qwrt_traffic_enable" "qwrt_online_enable" "debuglevel" "lang" \
+		"ip2region_db_path" "enable" "lite_enable" "device_name" "proxy_address" "qywx_api_url" "sleeptime" "oui_data" "qwrt_traffic_enable" "qwrt_online_enable" "tplink_enable" "debuglevel" "lang" \
 		"jsonpath" "sckey" "sc3key" "sc3uid" "sc3tags" "corpid" "userid" "agentid" "corpsecret" "mediapath" "wxpusher_apptoken" "wxpusher_uids" "wxpusher_topicIds" "pushplus_token" "wpush_apikey" "tg_api_server" "tg_token" "tg_chat_id" "tg_thread_id" "recipient_email" "smtp_host" "smtp_port" "smtp_tls" "smtp_starttls" "smtp_user" "smtp_passwordeval" "smtp_from" "smtp_from_full_name" \
 		"get_ipv4_mode" "ipv4_interface" "get_ipv6_mode" "ipv6_interface" \
 		"device_notification" "cpu_notification" "cpu_load_threshold" "temperature_threshold" \
@@ -657,7 +657,10 @@ utf8_byte_value() {
 	local value
 	[ -z "$1" ] && { printf '0'; return; }
 	printf -v value '%d' "'$1"
-	printf '%s' "${value:-0}"
+	# QWRT/musl 的 Bash 对单个非 ASCII 字节可能返回 U+DFxx（如 E4 -> 57316）。
+	# 这里处理的是原始字节，必须取低 8 位，否则 UTF-8 首字节被误当成单字节，
+	# 长中文/箭头文本会按字节截断，随后 JSON 编码用替换字符显示为乱码。
+	printf '%s' "$(( ${value:-0} & 255 ))"
 }
 
 # 计算字符串显示宽度（ASCII/半角为 1 列，中文及全角字符为 2 列）
@@ -1014,7 +1017,7 @@ getmac() {
 	process_and_check "$mac" && return
 
 	# QWRT 原生检测：ARP 项消失后仍保留已记录 MAC，用于准确判断离线并应用 MAC 黑白名单。
-	if [ "$qwrt_online_enable" = "1" ] && [ -f "$devices_json" ]; then
+	if { [ "$qwrt_online_enable" = "1" ] || [ "$tplink_enable" = "1" ]; } && [ -f "$devices_json" ]; then
 		local saved_mac=$(jq -r --arg ip "$ip" '.devices[] | select(.ip == $ip) | .mac // empty' "$devices_json" 2>/dev/null | head -n1)
 		process_and_check "$saved_mac" && return
 	fi
@@ -1034,7 +1037,17 @@ getname() {
 	[ -z "$mac" ] && return 1
 
 	# 自定义备注
-	tmp_name=$(cat "$device_aliases_path" 2>/dev/null | grep -i -Ew "^${ip}|^${mac}" | awk '{for(i=2; i<=NF; i++) printf $i " "; print ""}')
+	tmp_name=$(awk -v ip="$ip" -v mac="$mac" '
+		BEGIN { mac=tolower(mac); gsub(/-/, ":", mac) }
+		/^[[:space:]]*#/ { next }
+		NF >= 2 {
+			key=tolower($1); gsub(/-/, ":", key)
+			name=$0; sub(/^[[:space:]]*[^[:space:]]+[[:space:]]+/, "", name); sub(/[[:space:]]+$/, "", name)
+			if (key==mac && !by_mac) by_mac=name
+			if (key==ip && !by_ip) by_ip=name
+		}
+		END { if (by_mac) printf "%s", by_mac; else if (by_ip) printf "%s", by_ip }
+	' "$device_aliases_path" 2>/dev/null)
 	process_and_check "$tmp_name" "$name_width" && return
 
 	# 光猫
@@ -2143,7 +2156,15 @@ getmikrotik() {
 }
 
 # 在线设备列表
+refresh_tplink_fallback() {
+	[ "$tplink_enable" = "1" ] || return
+	local monitor_pid=$(cat "${dir}/tplink_monitor.pid" 2>/dev/null)
+	if [[ "$monitor_pid" =~ ^[0-9]+$ ]] && kill -0 "$monitor_pid" 2>/dev/null && grep -q '/usr/share/wechatpush/tplink-monitor' "/proc/$monitor_pid/cmdline" 2>/dev/null; then return; fi
+	lua /usr/share/wechatpush/tplink.lua >/dev/null 2>&1
+}
+
 first() {
+	refresh_tplink_fallback
 	[ "$qwrt_online_enable" = "1" ] && refresh_qwrt_overview_arp
 	# 注：此处为后台任务，无法操作父进程变量，故每个线程结束后都必须保存变量到文件
 	# 耗时太长，定时推送不再检查
@@ -2198,6 +2219,9 @@ up() {
 
 	jq -e --arg ip "$ip" '.devices[] | select(.ip == $ip and .status == "online") | .ip' "$devices_json" >/dev/null && return # 如果当前 IP 为在线，退出
 	local mac=$(getmac "$ip")
+	if [ "$tplink_enable" = "1" ]; then
+		case "$(tplink_mac_state "$mac")" in offline|pending) return 1 ;; esac
+	fi
 	getping "$ip" "$mac" "$up_timeout" "1" "up"
 	local ping_online=$?
 
@@ -2220,16 +2244,9 @@ up() {
 			local name=$(getname "$ip" "$mac")
 			local interface=$(getinterface "$ip" "$mac")
 			local http_access=$(check_http_access "$ip")
-			new_device='{
-				"name": "'"${name}"'",
-				"ip": "'"${ip}"'",
-				"mac": "'"${mac}"'",
-				"interface": "'"${interface}"'",
-				"uptime": "'"${time_up}"'",
-				"usage": "",
-				"http_access": "'"${http_access}"'",
-				"status": "online"
-			}'
+			local new_device=$(jq -n --arg name "$name" --arg ip "$ip" --arg mac "$mac" \
+				--arg interface "$interface" --arg uptime "$time_up" --arg http_access "$http_access" \
+				'{name:$name,ip:$ip,mac:$mac,interface:$interface,uptime:$uptime,usage:"",http_access:$http_access,status:"online"}')
 			jq --argjson newdevice "$new_device" '.devices += [$newdevice]' "$devices_json" >"$tmp_devices_json" && mv "$tmp_devices_json" "$devices_json"
 
 			blackwhitelist ${mac}
@@ -2282,10 +2299,46 @@ up() {
 }
 
 # 检测设备离线
+tplink_mac_state() {
+	lua /usr/share/wechatpush/tplink.lua ready "$1" 2>/dev/null
+}
+
+tplink_hold_offline() {
+	local ip="$1" mac="$2"
+	[ "$tplink_enable" = "1" ] || return 1
+	local auxiliary_state="${3:-$(tplink_mac_state "$mac")}"
+	[ "$auxiliary_state" = "unmanaged" ] && return 1
+	# 辅助检测仅阻止离线：只有明确、未过期的 TP-LINK offline 才进入原有流程。
+	# 不向原有上线扫描注入设备，不改变黑白名单、超时、重试或通知处理。
+	if [ "$tplink_enable" = "1" ] && [ "$auxiliary_state" != "offline" ]; then
+		jq -e --arg ip "$ip" ' .devices[] | select(.ip == $ip and (.status != "online" or has("qwrt_offline_since") or has("qwrt_offline_retries")))' "$devices_json" >/dev/null || return 0
+		silent_run LockFile lock
+		jq --arg ip "$ip" '.devices |= map(if .ip == $ip then .status = "online" | del(.qwrt_offline_since, .qwrt_offline_retries) else . end)' "$devices_json" >"$tmp_devices_json" && mv "$tmp_devices_json" "$devices_json"
+		silent_run LockFile unlock
+		return 0
+	fi
+	return 1
+}
+
 down() {
 	local ip="$1"
 	[ -z "$ip" ] && return 1
 	local mac=$(getmac "$ip")
+	# TP-LINK wireless clients use their own 30-second disconnect window.
+	# Wired/unmanaged clients retain the original detector and timeouts.
+	if [ "$tplink_enable" = "1" ]; then
+		local wireless_state=$(tplink_mac_state "$mac")
+		if [ "$wireless_state" != "unmanaged" ]; then
+			if [ "$wireless_state" = "offline" ]; then
+				silent_run LockFile lock
+				jq --arg ip "$ip" '.devices |= map(if .ip == $ip then .status = "offline" | del(.qwrt_offline_since, .qwrt_offline_retries) else . end)' "$devices_json" >"$tmp_devices_json" && mv "$tmp_devices_json" "$devices_json"
+				silent_run LockFile unlock
+			else
+				tplink_hold_offline "$ip" "$mac" "$wireless_state"
+			fi
+			return 0
+		fi
+	fi
 
 	# 默认沿用 fork 原有的自定义检测参数选择逻辑。
 	local tmp_timeout="$down_timeout"
@@ -2337,6 +2390,11 @@ down() {
 	fi
 	getping "$ip" "$mac" "$tmp_timeout" "$tmp_retry_count"
 	local ping_online=$?
+	# 主动探测可能跨越缓存有效期，提交离线前再次检查辅助数据。
+	if [ "$ping_online" -eq 1 ] && [ "$tplink_enable" = "1" ]; then
+		refresh_tplink_fallback
+	fi
+	[ "$ping_online" -eq 1 ] && tplink_hold_offline "$ip" "$mac" && return 0
 	silent_run LockFile lock
 
 	# 离线，置入待验证区
@@ -3552,6 +3610,8 @@ down_send() {
 	local offline_heading_added=0
 	for ip in $IPLIST; do
 		local mac=$(getmac "$ip")
+		# Recheck the latest shared snapshot before creating this offline event.
+		tplink_hold_offline "$ip" "$mac" && continue
 		blackwhitelist "$mac"
 		local ip_blackwhite=$?
 		[ -z "$notification_offline" ] && continue

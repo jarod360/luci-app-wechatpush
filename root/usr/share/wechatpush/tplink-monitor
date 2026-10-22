@@ -1,0 +1,28 @@
+#!/bin/sh
+# Independent read-only polling; native client scans must not delay this cache.
+lock=/tmp/wechatpush-tplink-monitor.lock
+pidfile=/tmp/wechatpush/tplink_monitor.pid
+if ! mkdir -m 700 "$lock" 2>/dev/null; then
+    owner=$(cat "$lock/owner" 2>/dev/null)
+    case "$owner" in ''|*[!0-9]*) ;; *) kill -0 "$owner" 2>/dev/null && exit 0 ;; esac
+    rm -f "$lock/owner"
+    rmdir "$lock" 2>/dev/null
+    mkdir -m 700 "$lock" 2>/dev/null || exit 1
+fi
+mkdir -p /tmp/wechatpush
+printf '%s\n' "$$" > "$lock/owner"
+printf '%s\n' "$$" > "$pidfile"
+cleanup() {
+    [ -n "$child" ] && kill "$child" 2>/dev/null
+    rm -f "$pidfile" "$lock/owner"
+    rmdir "$lock" 2>/dev/null
+}
+trap 'exit 0' INT TERM
+trap cleanup EXIT
+while [ "$(uci -q get wechatpush.config.enable)" = 1 ] &&
+      [ "$(uci -q get wechatpush.config.tplink_enable)" = 1 ]; do
+    lua /usr/share/wechatpush/tplink.lua >/dev/null 2>&1 &
+    child=$!; wait "$child"
+    sleep 10 &
+    child=$!; wait "$child"
+done

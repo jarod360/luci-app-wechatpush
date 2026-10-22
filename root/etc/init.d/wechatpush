@@ -22,6 +22,12 @@ start_service() {
     enable_value=$(uci get wechatpush.config.enable 2>/dev/null || echo "0")
     [ "$enable_value" -ne "0" ] && procd_set_param command /usr/share/wechatpush/wechatpush && echo "wechatpush is starting now ..."
     procd_close_instance
+    if [ "$enable_value" != "0" ] && [ "$(uci -q get wechatpush.config.tplink_enable)" = "1" ]; then
+        procd_open_instance tplink
+        procd_set_param command /bin/sh /usr/share/wechatpush/tplink-monitor
+        procd_set_param respawn
+        procd_close_instance
+    fi
 }
 
 reload_service() {
@@ -31,6 +37,12 @@ reload_service() {
 }
 
 stop_service() {
+    if [ -f "${dir}tplink_monitor.pid" ]; then
+        tplink_pid=$(cat "${dir}tplink_monitor.pid")
+        case "$tplink_pid" in ''|*[!0-9]*) ;; *)
+            grep -q '/usr/share/wechatpush/tplink-monitor' "/proc/$tplink_pid/cmdline" 2>/dev/null && kill "$tplink_pid" 2>/dev/null
+        ;; esac
+    fi
     [ -f ${dir}child_pid ] && parent_pid=$(cat ${dir}child_pid)
     [ -n "$parent_pid" ] && {
         child_pids=$(pgrep -P $parent_pid)

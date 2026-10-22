@@ -1,7 +1,7 @@
 # luci-app-wechatpush
 
 [![Build](https://github.com/jarod360/luci-app-wechatpush/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/jarod360/luci-app-wechatpush/actions/workflows/build.yml)
-![Version](https://img.shields.io/badge/version-3.6.19-blue)
+![Version](https://img.shields.io/badge/version-3.6.20-blue)
 [![License](https://img.shields.io/badge/license-GPL--2.0-blue.svg)](LICENSE)
 
 [简体中文](README.md) | [English](README_en.md)
@@ -10,7 +10,7 @@
 
 **luci-app-wechatpush** is an OpenWrt LuCI plugin for network monitoring and notifications. This repository is a maintained fork of [tty228/luci-app-wechatpush](https://github.com/tty228/luci-app-wechatpush). It retains the upstream notification and monitoring functions while adding QWRT-native traffic and online detection, IP geolocation lookup, batched device-event notifications, and compatibility fixes.
 
-Current package version: **3.6.19-1**
+Current package version: **3.6.20-1**
 
 ## Features
 
@@ -46,6 +46,24 @@ These options require **QWRT 2026.10.6 or later** and are enabled separately und
 
 Both QWRT options are independent and disabled by default. Do not enable them on non-QWRT systems.
 
+### TP-LINK wireless presence assistance (3.6.20)
+
+Disabled by default. Under Basic Settings, below QWRT native online detection, enable TP-LINK assistance, enter its management IPv4 address, username and password, then choose **Save & Apply**. No Home Assistant, SSH, diagnostic mode or TP-LINK configuration changes are required.
+
+- The green wireless online count opens a client list with name, IP, MAC, AP and SSID. Screens up to 767 px show name, IP and AP only. Saved WeChatPush aliases take precedence (MAC, then IP), followed by the TP-LINK name; unnamed/anonymous clients are labelled accordingly. No remarks are written back to TP-LINK. Refresh reads the existing background cache.
+- A recognised TP-LINK wireless client must remain disconnected for **30 seconds**, with a successful observation after that deadline still confirming offline. It then enters the normal notification path without waiting for QWRT or the fork detector's offline timeout.
+- A newer reconnect, successful roam or current online record cancels the offline event. The shared cache is checked again before composing an offline notification. Same-second recovery wins over disconnect.
+- Missing records alone, expired data, request/log failures or ambiguous status do not confirm a known wireless client offline. Wired/unmanaged devices, a disabled helper and clients not yet identified by a successful collection retain the original detector.
+- This works with QWRT native detection enabled or disabled. Existing online discovery, notification switches, filters, Do-Not-Disturb, event batching and send retries remain in effect. TP-LINK clients are not automatically imported into the main device list, so counts may differ.
+- Each completed background poll is followed by a roughly 10-second wait. Offline decisions require data at most 30 seconds old. Initial logs cover up to the past 24 hours; subsequent reads are incremental. Delivery includes polling, main-loop and provider latency in addition to the 30-second window. A reconnect after that window can still follow an offline notification.
+- Green means connected; red means a connection, credential, configuration or freshness problem; orange means an incompatible API response; grey means loading. The badge shows only the current wireless online count, not historical offline totals.
+
+Tested on **TL-R5005P-AC 1.0, firmware 1.0.4 Build 260414**, with **QWRT 25.12.2**. Other models, firmware and log languages require compatibility checks. The adapter uses local HTTP; passwords, cookies and tokens are excluded from the LuCI cache. Polling may replace an existing web session for the same account. Runtime data is in `/tmp` and rebuilt after reboot. Disable the helper to restore the original offline logic. See [adapter details and tests](docs/tplink-assist.md).
+
+### Other 3.6.20 changes
+
+Fix UTF-8 byte handling on QWRT Bash/musl, exact MAC/IP alias matching and literal percent/quote handling. Prevent stale ARP from undoing a TP-LINK offline decision, reduce unchanged-state writes and prevent dismissed client dialogs from reopening after asynchronous reads. Update WeCom application setup wording and identify image-message logs as `【企业微信图文版】`. For a WeCom API proxy, allow its IP in the application trusted-IP list; for a forward proxy, allow its actual public egress IP. Protocol, UI, original/native detector, alias and UTF-8 regressions now run before package builds and releases.
+
 ### Offline detection parameters and MAC list
 
 The offline timeout and detection count in Advanced Settings control offline confirmation. A new “Offline custom detection devices” mode is available in “MAC Filtering Mode 1”. Selecting it reveals the “Offline custom detection list” MAC selector:
@@ -75,7 +93,7 @@ The package architecture is `all`. OpenWrt's package manager resolves the requir
 To install a package built by this repository's GitHub Actions, download the matching artifact and run, for example:
 
 ```sh
-opkg install ./luci-app-wechatpush_3.6.19-1_all.ipk
+opkg install ./luci-app-wechatpush_3.6.20-1_all.ipk
 ```
 
 Optional dependencies:

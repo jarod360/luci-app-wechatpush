@@ -1,6 +1,8 @@
 
 config wechatpush "config"
 	option enable '0'
+	option tplink_enable '0'
+	option tplink_host '192.168.0.1'
 	option sleeptime '60'
 	option debuglevel '1'
 	option up_timeout '2'
