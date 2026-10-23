@@ -101,7 +101,7 @@ To install a package built by this repository's GitHub Actions, download the mat
 opkg install ./luci-app-wechatpush_3.6.20_all.ipk
 ```
 
-The older SDK records the IPK package version as `3.6.20`. If an earlier revision of that version is already installed, use `opkg --force-reinstall install ./luci-app-wechatpush_3.6.20_all.ipk` for r8 and update the matching language package. APK builds carry the separate `-r8` revision.
+The older SDK records the IPK package version as `3.6.20`. If an earlier revision of that version is already installed, use `opkg --force-reinstall install ./luci-app-wechatpush_3.6.20_all.ipk` for r9 and update the matching language package. APK builds carry the separate `-r9` revision.
 
 Optional dependencies:
 
@@ -153,3 +153,5 @@ The login whitelist exempts IPs from automatic blocking, not notifications. Enab
 - **Log anti-flooding**: shown and applied only in first-login mode. Keep the first event log and omit repeats during the window. Disabling it records repeats without resending notifications.
 
 Timing is independent of logs. Failed sends or global DND do not start a notification window. RAM state in `/tmp/wechatpush/login_notice_times.json` is mode 600, bounded to 256 IPs and cleared on reboot. Failed-login counters, blocking thresholds and whitelist blocking exemptions remain in place.
+
+Revision **r9** fills missing TP-LINK client IPv4 display addresses by MAC from the QWRT online-device table, then an unambiguous host hint. Offline device records are excluded; valid TP-LINK IPs retain priority. The resolved IP also supports alias lookup. This is display-only and adds no polling or presence changes.

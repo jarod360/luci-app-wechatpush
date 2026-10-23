@@ -91,6 +91,29 @@ const helper = new Function('baseclass','fs','uci','L','E','ui','rpc', badgeSour
     assert.equal(table.children[4].children[0].children, '本机设备名');
     assert.equal(table.children[5].children[0].children, '未命名');
     assert.ok(modal[0].children.includes('@media(max-width:767px)'));
+    cacheData.online_clients = [
+        {name:'watch',mac:'55-66-77-88-99-AA',ip:'',ap:'AP-A'},
+        {name:'hint',mac:'66:77:88:99:aa:bb',ip:'0.0.0.0'},
+        {name:'native',mac:'77:88:99:aa:bb:cc',ip:'192.0.2.7'},
+        {name:'offline',mac:'88:99:aa:bb:cc:dd',ip:''},
+        {name:'ambiguous',mac:'99:aa:bb:cc:dd:ee',ip:''}
+    ];
+    hostHints = {'66:77:88:99:AA:BB':{ipaddrs:['192.0.2.6']},
+        '99:aa:bb:cc:dd:ee':{ipaddrs:['192.0.2.9','192.0.2.10']}};
+    localDevices={devices:[
+        {mac:'55:66:77:88:99:aa',ip:'192.0.2.5',status:'online'},
+        {mac:'77:88:99:aa:bb:cc',ip:'192.0.2.70',status:'online'},
+        {mac:'88:99:aa:bb:cc:dd',ip:'192.0.2.8',status:'offline'}]};
+    aliasData='192.0.2.5 Watch alias\n';
+    await helper.showClients();
+    const ipTable=modal[2].children[0];
+    assert.equal(ipTable.children[1].children[0].children, 'Watch alias');
+    assert.equal(ipTable.children[1].children[1].children, '192.0.2.5');
+    assert.equal(ipTable.children[2].children[1].children, '192.0.2.6');
+    assert.equal(ipTable.children[3].children[1].children, '192.0.2.7');
+    assert.equal(ipTable.children[4].children[1].children, '—');
+    assert.equal(ipTable.children[5].children[1].children, '—');
+    assert.equal(cacheData.online_clients[0].ip, '', 'display fallback must not change TP-LINK presence data');
     deferred={};
     const pending=helper.showClients();
     const loading=modal;

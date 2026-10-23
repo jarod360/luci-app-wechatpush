@@ -123,7 +123,7 @@
 opkg install ./luci-app-wechatpush_3.6.20_all.ipk
 ```
 
-旧版 SDK 生成的 IPK 包内版本仍为 `3.6.20`。若已安装同版本的早期修订，更新 r8 时请使用 `opkg --force-reinstall install ./luci-app-wechatpush_3.6.20_all.ipk`，并更新对应中文语言包。APK 产物包含独立的 `-r8` 修订号。
+旧版 SDK 生成的 IPK 包内版本仍为 `3.6.20`。若已安装同版本的早期修订，更新 r9 时请使用 `opkg --force-reinstall install ./luci-app-wechatpush_3.6.20_all.ipk`，并更新对应中文语言包。APK 产物包含独立的 `-r9` 修订号。
 
 可选依赖：
 
@@ -175,3 +175,5 @@ bash -x /usr/share/wechatpush/wechatpush t1
 - **登录提醒日志免刷屏**：只在首次登录推送模式下显示和生效；首次事件仍记录，窗口内重复事件不记录。关闭此项则重复事件仍记日志，但不会因此重复推送。
 
 免打扰计时不再读取日志，关闭、清空、轮转日志均不改变窗口；通知发送失败或被全局免打扰拦截时不开始计时。独立状态保存在 `/tmp/wechatpush/login_notice_times.json`，最多保留 256 个 IP，权限 600，设备重启后清空。失败登录计数、封禁阈值和白名单免封禁规则保留。
+
+修订 **r9**：TP-LINK 在线客户端弹窗在 TP-LINK 未提供有效 IPv4 地址时，按 MAC 匹配 QWRT 在线设备表，再尝试唯一的主机提示地址；不会使用离线设备记录补全，不覆盖 TP-LINK 已提供的有效 IP。补全后的地址也用于 IP 别名匹配；仅影响显示，不增加轮询或修改在线判定。

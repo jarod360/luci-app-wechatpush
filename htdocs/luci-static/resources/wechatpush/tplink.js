@@ -29,6 +29,13 @@ return baseclass.extend({
 				}
 			});
 			var hostNames = Object.create(null), deviceNames = Object.create(null);
+			var hostIPs = Object.create(null), deviceIPs = Object.create(null);
+			var normalizeMAC = function (mac) { return String(mac || '').toLowerCase().replace(/-/g, ':'); };
+			var usableIP = function (ip) {
+				if (typeof ip !== 'string' || !/^\d{1,3}(\.\d{1,3}){3}$/.test(ip.trim())) return '';
+				var parts = ip.trim().split('.').map(Number);
+				return parts[0] > 0 && parts[0] < 224 && parts.every(function (part) { return part <= 255; }) ? parts.join('.') : '';
+			};
 			var usefulName = function (value) {
 				return typeof value === 'string' && value.trim() && !/^(anonymous|unknown|未命名|未知|\*)$/i.test(value.trim()) ? value.trim() : '';
 			};
@@ -39,10 +46,19 @@ return baseclass.extend({
 			};
 			Object.keys(result[2] || {}).forEach(function (mac) {
 				var hint = result[2][mac] || {}; remember(hostNames, mac, hint.ipaddrs, hint.name || hint.hostname);
+				var ips = (Array.isArray(hint.ipaddrs) ? hint.ipaddrs : []).map(usableIP).filter(function (ip, i, all) { return ip && all.indexOf(ip) === i; });
+				if (ips.length === 1) hostIPs[normalizeMAC(mac)] = ips[0];
 			});
 			try {
 				var localDevices = JSON.parse(result[3]).devices;
-				(Array.isArray(localDevices) ? localDevices : []).forEach(function (row) { if (row) remember(deviceNames, row.mac, [row.ip], row.name); });
+				(Array.isArray(localDevices) ? localDevices : []).forEach(function (row) {
+					if (!row) return;
+					remember(deviceNames, row.mac, [row.ip], row.name);
+					if (row.status === 'online' && usableIP(row.ip)) {
+						var mac = normalizeMAC(row.mac), ip = usableIP(row.ip);
+						if (mac) deviceIPs[mac] = deviceIPs[mac] === undefined || deviceIPs[mac] === ip ? ip : '';
+					}
+				});
 			} catch (e) {}
 			var fresh = data && data.state === 'connected' && typeof data.updated_at === 'number' &&
 				Date.now() / 1000 >= data.updated_at && Date.now() / 1000 - data.updated_at <= 30;
@@ -50,11 +66,12 @@ return baseclass.extend({
 			var table = E('table', { 'class': 'tplink-client-table', 'style': 'width:100%;border-collapse:collapse;font-size:13px' }, [E('tr', {},
 				['设备名称', 'IP 地址', 'MAC 地址', '所属 AP', '无线网络（SSID）'].map(function (label) { return E('th', { 'style': 'text-align:left;padding:10px 8px;border-bottom:2px solid #ddd;white-space:nowrap' }, label); }))]);
 			rows.forEach(function (row) {
+				var mac = normalizeMAC(row.mac), ip = usableIP(row.ip) || deviceIPs[mac] || hostIPs[mac] || '';
 				table.appendChild(E('tr', {}, ['name', 'ip', 'mac', 'ap', 'ssid'].map(function (key) {
 					var value = typeof row[key] === 'string' && row[key] ? row[key] : '—';
+					if (key === 'ip') value = ip || '—';
 					if (key === 'name') {
-						var mac = String(row.mac || '').toLowerCase().replace(/-/g, ':');
-						value = aliases[mac] || aliases[row.ip] || (hostNames[mac] || hostNames[row.ip] || deviceNames[mac] || deviceNames[row.ip] || usefulName(row.name)).replace(/\.lan$/i, '') || '未命名';
+						value = aliases[mac] || aliases[ip] || (hostNames[mac] || hostNames[ip] || deviceNames[mac] || deviceNames[ip] || usefulName(row.name)).replace(/\.lan$/i, '') || '未命名';
 					}
 					return E('td', { 'style': 'padding:10px 8px;border-bottom:1px solid #ddd' }, value);
 				})));
