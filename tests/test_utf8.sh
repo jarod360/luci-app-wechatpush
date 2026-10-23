@@ -15,6 +15,10 @@ for locale in C C.UTF-8 en_US.UTF-8; do
         check "$(length_str '↙ 5.83 M')" 8
         check "$(length_str 'A😀中')" 5
         check "$(cut_str '主卧窗帘' 16)" '主卧窗帘'
+        check "$(cut_str '客厅窗帘' 20)" '客厅窗帘'
+        check "$(cut_str '主卧纱帘' 20)" '主卧纱帘'
+        check "$(cut_str '客厅窗帘' 3)" '客..'
+        check "$(cut_str 'A  中' 3)" 'A..'
         check "$(cut_str '主卧窗帘很长很长很长测试' 16)" '主卧窗帘很长很长..'
         check "$(cut_str 'A😀中' 3)" 'A😀..'
         check "$(cut_str '↙ 5.83 M' 16)" '↙ 5.83 M'

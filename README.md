@@ -123,7 +123,7 @@
 opkg install ./luci-app-wechatpush_3.6.20_all.ipk
 ```
 
-旧版 SDK 生成的 IPK 包内版本仍为 `3.6.20`。若已安装同版本的早期修订，更新 r6 时请使用 `opkg --force-reinstall install ./luci-app-wechatpush_3.6.20_all.ipk`，并更新对应中文语言包。APK 产物包含独立的 `-r6` 修订号。
+旧版 SDK 生成的 IPK 包内版本仍为 `3.6.20`。若已安装同版本的早期修订，更新 r7 时请使用 `opkg --force-reinstall install ./luci-app-wechatpush_3.6.20_all.ipk`，并更新对应中文语言包。APK 产物包含独立的 `-r7` 修订号。
 
 可选依赖：
 
@@ -162,3 +162,5 @@ bash -x /usr/share/wechatpush/wechatpush t1
 修订 **r4**：TP-LINK 在线客户端弹窗隐藏自动识别名称末尾的 `.lan`（不区分大小写），例如 `iQOO-15.lan` 显示为 `iQOO-15`；自定义别名保持原样。
 
 修订 **r5**：统一 fork 新增设置项的说明宽度与自动换行，离线参数说明按条件分行，保持现有主题的标签、控件及字体样式。
+
+修订 **r7**：名称裁剪和显示宽度改为通过 jq 按 Unicode 码点处理，避免 Bash/musl 逐字节切分、拼接中文；兼容未编译正则模块的 jq。目标 QWRT 的检测、模板及并发发送回归通过。已观察到一次发送前 JSON 内含替换字符，但旧实现的历史偶发问题尚未复现，不将此修改表述为已确定全部根因。

@@ -665,83 +665,23 @@ utf8_byte_value() {
 
 # 计算字符串显示宽度（ASCII/半角为 1 列，中文及全角字符为 2 列）
 length_str() {
-	local LC_ALL=C
-	local str="$1"
-	[ -z "$str" ] && { echo 0; return; }
-
-	local i=0 byte_count=${#str} display_width=0 byte byte_code char_bytes
-	while [ "$i" -lt "$byte_count" ]; do
-		byte="${str:$i:1}"
-		byte_code=$(utf8_byte_value "$byte")
-		if [ "$byte_code" -lt 128 ]; then
-			char_bytes=1
-			display_width=$((display_width + 1))
-		elif [ "$byte_code" -ge 240 ] && [ "$byte_code" -le 247 ]; then
-			char_bytes=4
-			display_width=$((display_width + 2))
-		elif [ "$byte_code" -ge 224 ] && [ "$byte_code" -le 239 ]; then
-			char_bytes=3
-			# E0-E2 常见符号按 1 列；E3-EF 中日韩宽字符按 2 列。
-			if [ "$byte_code" -le 226 ]; then
-				display_width=$((display_width + 1))
-			else
-				display_width=$((display_width + 2))
-			fi
-		elif [ "$byte_code" -ge 192 ] && [ "$byte_code" -le 223 ]; then
-			char_bytes=2
-			display_width=$((display_width + 1))
-		else
-			char_bytes=1
-			display_width=$((display_width + 1))
-		fi
-		i=$((i + char_bytes))
-	done
-
-	echo "$display_width"
+	# jq 按 Unicode 码点处理，不在 Bash/musl 中逐字节切分或拼接 UTF-8。
+	printf '%s' "$1" | jq -Rrs 'explode | map(if . >= 12288 then 2 else 1 end) | add // 0'
 }
 
 # 字符串显示宽度裁剪，按 UTF-8 字符边界截断，避免中文被拆成乱码
 cut_str() {
 	[ -z "$2" ] && return
-	local LC_ALL=C
-	local str="$1"
-	local max_width="$2"
-	local result=""
-	local i=0 byte_count=${#str} current_width=0 byte byte_code char_bytes char_width char
-
-	while [ "$i" -lt "$byte_count" ]; do
-		byte="${str:$i:1}"
-		byte_code=$(utf8_byte_value "$byte")
-		if [ "$byte_code" -lt 128 ]; then
-			char_bytes=1
-			char_width=1
-		elif [ "$byte_code" -ge 240 ] && [ "$byte_code" -le 247 ]; then
-			char_bytes=4
-			char_width=2
-		elif [ "$byte_code" -ge 224 ] && [ "$byte_code" -le 239 ]; then
-			char_bytes=3
-			if [ "$byte_code" -le 226 ]; then char_width=1; else char_width=2; fi
-		elif [ "$byte_code" -ge 192 ] && [ "$byte_code" -le 223 ]; then
-			char_bytes=2
-			char_width=1
-		else
-			char_bytes=1
-			char_width=1
-		fi
-
-		[ "$((current_width + char_width))" -gt "$max_width" ] && break
-		char="${str:$i:$char_bytes}"
-		result="${result}${char}"
-		current_width=$((current_width + char_width))
-		i=$((i + char_bytes))
-	done
-
-	if [ "$current_width" -lt "$(length_str "$str")" ]; then
-		result=$(printf '%s' "$result" | sed 's/ *$//')
-		result="${result}.."
-	fi
-
-	printf '%s\n' "$result"
+	[[ "$2" =~ ^[0-9]+$ ]] || return 1
+	printf '%s' "$1" | jq -Rrs --argjson limit "$2" '
+		reduce (explode[]) as $cp
+			({text: "", width: 0, clipped: false};
+			 if .clipped then .
+			 else (if $cp >= 12288 then 2 else 1 end) as $width
+			 | if .width + $width > $limit then .clipped = true
+			   else .text += ([$cp] | implode) | .width += $width end
+			 end)
+		| if .clipped then (.text | explode | until(length == 0 or .[-1] != 32; .[:-1]) | implode) + ".." else .text end'
 }
 
 # 按模板生成字段间距：兼容旧版固定间距调用。
