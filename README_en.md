@@ -101,7 +101,7 @@ To install a package built by this repository's GitHub Actions, download the mat
 opkg install ./luci-app-wechatpush_3.6.20_all.ipk
 ```
 
-The older SDK records the IPK package version as `3.6.20`. If an earlier revision of that version is already installed, use `opkg --force-reinstall install ./luci-app-wechatpush_3.6.20_all.ipk` for r9 and update the matching language package. APK builds carry the separate `-r9` revision.
+The older SDK records the IPK package version as `3.6.20`. If an earlier revision of that version is already installed, use `opkg --force-reinstall install ./luci-app-wechatpush_3.6.20_all.ipk` for r10 and update the matching language package. APK builds carry the separate `-r10` revision.
 
 Optional dependencies:
 
@@ -155,3 +155,5 @@ The login whitelist exempts IPs from automatic blocking, not notifications. Enab
 Timing is independent of logs. Failed sends or global DND do not start a notification window. RAM state in `/tmp/wechatpush/login_notice_times.json` is mode 600, bounded to 256 IPs and cleared on reboot. Failed-login counters, blocking thresholds and whitelist blocking exemptions remain in place.
 
 Revision **r9** fills missing TP-LINK client IPv4 display addresses by MAC from the QWRT online-device table, then an unambiguous host hint. Offline device records are excluded; valid TP-LINK IPs retain priority. The resolved IP also supports alias lookup. This is display-only and adds no polling or presence changes.
+
+Revision **r10** improves the original online-device list with alias-first QWRT host hints and saved-name fallback. Automatic .lan suffixes are hidden and missing names display as 未命名. Regular backend scans share one host-hint query and refresh names for TP-LINK-managed online clients instead of skipping metadata on early return. Fast detection rounds do not repeat the query; internal unknown presence states are unchanged.

@@ -128,6 +128,8 @@ jobs:
           python tests/test_ip2region.py
           python tests/test_tplink.py
           node tests/test_tplink_ui.js
+          node tests/test_client_names.js
+          bash tests/test_name_hints.sh
           bash tests/test_tplink_down.sh
           bash tests/test_login_notifications.sh
           bash tests/test_offline_parameters.sh

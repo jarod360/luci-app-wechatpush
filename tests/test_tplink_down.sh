@@ -38,6 +38,13 @@ for qwrt_online_enable in 0 1; do
   done
 done
 echo 'PASS: 48 native/legacy/auxiliary state combinations'
+reset_device
+tplink_enable=1; test_tplink=online
+jq '.devices[0].name="unknown"' "$devices_json" > "$tmp_devices_json" && mv "$tmp_devices_json" "$devices_json"
+down 192.0.2.1
+[ "$(jq -r '.devices[0].name' "$devices_json")" = fixture ] || exit 1
+expect_state online
+echo 'PASS: auxiliary online branch refreshes device names without changing presence'
 # Returning TP-LINK presence must clear prior QWRT debounce markers.
 qwrt_online_enable=1; tplink_enable=1; test_native=1; test_tplink=online
 echo '{"devices":[{"ip":"192.0.2.1","status":"unknown","qwrt_offline_since":1,"qwrt_offline_retries":3}]}' > "$devices_json"

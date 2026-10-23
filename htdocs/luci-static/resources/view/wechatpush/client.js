@@ -12,9 +12,30 @@ var callClientRates = rpc.declare({
 	params: ['addresses'],
 	expect: { '': {} }
 });
+var callHostHints = rpc.declare({ object: 'luci-rpc', method: 'getHostHints', expect: { '': {} } });
 
 
 return view.extend({
+	resolveDeviceNames: function (devices, aliasesText, hints) {
+		var aliases = Object.create(null), names = Object.create(null), ipNames = Object.create(null);
+		var macKey = function (mac) { return String(mac || '').toLowerCase().replace(/-/g, ':'); };
+		var useful = function (name) { return typeof name === 'string' && !/^(unknown|anonymous|null|未命名|未知|\*)?$/i.test(name.trim()) ? name.trim() : ''; };
+		String(aliasesText || '').split(/\r?\n/).forEach(function (line) {
+			var match = line.trim().match(/^(\S+)\s+(.+)$/);
+			if (match && match[1][0] !== '#') { var key = macKey(match[1]); if (!aliases[key]) aliases[key] = match[2].trim(); }
+		});
+		Object.keys(hints || {}).forEach(function (mac) {
+			var hint = hints[mac] || {}, name = useful(hint.name) || useful(hint.hostname);
+			if (!name) return;
+			names[macKey(mac)] = name;
+			(Array.isArray(hint.ipaddrs) ? hint.ipaddrs : []).forEach(function (ip) { ipNames[ip] = ipNames[ip] === undefined || ipNames[ip] === name ? name : ''; });
+		});
+		return devices.map(function (device) {
+			var mac = macKey(device.mac), name = aliases[mac] || aliases[device.ip];
+			if (!name) name = (names[mac] || (!/^[0-9a-f]{2}(:[0-9a-f]{2}){5}$/.test(mac) && ipNames[device.ip]) || useful(device.name)).replace(/\.lan$/i, '') || '未命名';
+			return Object.assign({}, device, { name: name });
+		});
+	},
 	load: function () {
 		var self = this;
 		// 清除 localStorage 中的排序设置
@@ -49,9 +70,10 @@ return view.extend({
 	fetchDevices: function () {
 		var self = this;
 		var devices_path = '/tmp/wechatpush/devices.json';
-		return fs.read(devices_path).then(function (content) {
+		return Promise.all([fs.read(devices_path), L.resolveDefault(fs.read('/usr/share/wechatpush/api/device_aliases.list'), ''), L.resolveDefault(callHostHints(), {})]).then(function (results) {
 			try {
-				var data = JSON.parse(content);
+				var data = JSON.parse(results[0]);
+				data.devices = self.resolveDeviceNames(Array.isArray(data.devices) ? data.devices : [], results[1], results[2]);
 				if (uci.get('wechatpush', 'config', 'qwrt_traffic_enable') === '1') {
 					var addresses = data.devices.filter(function (device) {
 						return (device.status === 'online' || device.status === 'unknown') && /^\d{1,3}(\.\d{1,3}){3}$/.test(device.ip || '');
@@ -309,7 +331,7 @@ return view.extend({
 								cell.textContent = '';
 							}
 						} else {
-							cell.textContent = device[columns[i]];
+							cell.textContent = device[columns[i]] === 'unknown' ? '未知' : device[columns[i]];
 						}
 						row.appendChild(cell);
 					}
@@ -359,8 +381,8 @@ return view.extend({
 
 			// 处理 name/mac 列的 "unknown" 优先级
 			if (column === 'name' || column === 'mac') {
-				const isUnknown1 = (value1 === "unknown");
-				const isUnknown2 = (value2 === "unknown");
+				const isUnknown1 = (value1 === "unknown" || value1 === "未命名");
+				const isUnknown2 = (value2 === "unknown" || value2 === "未命名");
 
 				if (isUnknown1 !== isUnknown2) {
 					return direction === 'asc' 

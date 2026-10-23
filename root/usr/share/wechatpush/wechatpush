@@ -593,7 +593,7 @@ silent_run() {
 process_and_check() {
 	[ -z "$1" ] && return 1
 	local value=$(echo "$1" | tr -d '\n\r' | awk '$1=$1' | sed 's/_/ /g' | grep -v "^$" | sort -u | head -n1)
-	[ "$value" == "unknown" ] && value=""
+	case "$value" in unknown|Unknown|UNKNOWN|null|NULL|anonymous|Anonymous|未命名|未知|'*') value="" ;; esac
 	[ -n "$value" ] && [ -n "$2" ] && echo "$(cut_str "$value" "$2")" && return 0
 	[ -n "$value" ] && echo "$value" && return 0
 	return 1
@@ -966,6 +966,17 @@ getmac() {
 	echo "unknown"
 }
 
+# 每轮常规扫描只读取一次主机提示，检测线程共享缓存，避免逐设备 RPC。
+refresh_name_hints() {
+	local tmp
+	tmp=$(mktemp "${dir}/host-hints.XXXXXX") || return
+	if ubus -t 2 call luci-rpc getHostHints '{}' >"$tmp" 2>/dev/null && jq -e 'type == "object"' "$tmp" >/dev/null 2>&1; then
+		mv -f "$tmp" "${dir}/host_hints.json"
+	else
+		rm -f "$tmp"
+	fi
+}
+
 # 查询主机名
 getname() {
 	local ip="$1"
@@ -1013,6 +1024,13 @@ getname() {
 		tmp_name=$(jq -r --arg mac "$mac" '.[] | select((.mac | ascii_downcase) == ($mac | ascii_downcase)) | .name' "${dir}/openwrt_info")
 		process_and_check "$tmp_name" "$name_width" && return
 	}
+
+	# 优先读取系统已识别名称，避免旧的 unknown/厂家名长期遮蔽 DHCP 更新。
+	if [ -s "${dir}/host_hints.json" ]; then
+		tmp_name=$(jq -r --arg mac "$mac" 'to_entries[] | select((.key | ascii_downcase | split("-") | join(":")) == ($mac | ascii_downcase | split("-") | join(":"))) | (.value.name // .value.hostname // empty)' "${dir}/host_hints.json" 2>/dev/null)
+		case "$tmp_name" in *.lan|*.LAN) tmp_name="${tmp_name%.*}" ;; esac
+		process_and_check "$tmp_name" "$name_width" && return
+	fi
 
 	# 已保存的主机名
 	tmp_name=$(jq -r --arg ip "$ip" --arg mac "$mac" '.devices[] | select(.ip == $ip and (.mac | ascii_downcase) == ($mac | ascii_downcase)) | .name' "$devices_json")
@@ -2104,7 +2122,10 @@ refresh_tplink_fallback() {
 }
 
 first() {
+	local refresh_client_names=1
+	[ "$1" = "qwrt-fast" ] && refresh_client_names=0
 	refresh_tplink_fallback
+	[ "$1" != "qwrt-fast" ] && refresh_name_hints
 	[ "$qwrt_online_enable" = "1" ] && refresh_qwrt_overview_arp
 	# 注：此处为后台任务，无法操作父进程变量，故每个线程结束后都必须保存变量到文件
 	# 耗时太长，定时推送不再检查
@@ -2275,6 +2296,16 @@ down() {
 				silent_run LockFile unlock
 			else
 				tplink_hold_offline "$ip" "$mac" "$wireless_state"
+				if [ "$wireless_state" = "online" ] && [ "${refresh_client_names:-1}" = "1" ]; then
+					local refreshed_name=$(getname "$ip" "$mac")
+					if [ -n "$refreshed_name" ] && [ "$refreshed_name" != "unknown" ]; then
+						silent_run LockFile lock
+						if ! jq -e --arg ip "$ip" --arg name "$refreshed_name" '.devices[] | select(.ip == $ip and .name == $name)' "$devices_json" >/dev/null; then
+						jq --arg ip "$ip" --arg mac "$mac" --arg name "$refreshed_name" '.devices |= map(if .ip == $ip and ((.mac // "" | ascii_downcase) == ($mac | ascii_downcase)) then .name = $name else . end)' "$devices_json" >"$tmp_devices_json" && mv "$tmp_devices_json" "$devices_json"
+						fi
+						silent_run LockFile unlock
+					fi
+				fi
 			fi
 			return 0
 		fi
