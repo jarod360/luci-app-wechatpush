@@ -872,18 +872,17 @@ return view.extend({
 		o.depends({ login_notification: "ssh_logged", '!contains': true });
 		o.depends({ login_notification: "web_login_failed", '!contains': true });
 		o.depends({ login_notification: "ssh_login_failed", '!contains': true });
-		o.description = _('Add the IP addresses in the list to the whitelist for the blocking function (if available), and ignore automatic blocking and login event notifications. Only record in the log. Mask notation is currently not supported.');
+		o.description = formatHelp(_('IPs in this list are exempt from automatic blocking. Login notifications and logging follow the Login Reminder Do Not Disturb and Login Reminder Log Anti-Flooding settings. Only individual IP addresses are supported, not subnets or mask notation.'));
 
 		o = s.taboption('disturb', form.Flag, 'login_log_enable', _('Login reminder log anti-flooding'));
-		o.description = _('Users in the whitelist or during the undisturbed time period after their first login IP will be exempt from log recording, preventing log flooding.');
-		o.depends('login_disturb', '1');
+		o.description = formatHelp(_('In first-login notification mode, log the first notification but skip repeated logins during the suppression interval.<br/>This option only affects logs, not notifications or suppression timing. Log-only mode records every login, including whitelist IPs.'));
 		o.depends('login_disturb', '2');
 
 		o = s.taboption('disturb', form.Value, 'login_notification_delay', _('Login reminder do not disturb time (s)'));
 		o.rmempty = false;
 		o.placeholder = '3600';
 		o.datatype = 'and(uinteger,min(10))';
-		o.description = _('Send notification after the first login and do not repeat within the specified time<br/>Take a shortcut and read the login time from the log');
+		o.description = formatHelp(_('Send a notification on the first eligible login, then suppress repeated notifications from the same IP for the configured interval. Web and SSH share this interval.<br/>Timing is independent of logs and starts only after a successful notification.'));
 		o.depends('login_disturb', '2');
 
 		return m.render();

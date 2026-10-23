@@ -840,8 +840,8 @@ msgid "Login reminder do not disturb time (s)"
 msgstr "登录提醒免打扰时间（秒）"
 
 #: applications/luci-app-wechatpush/htdocs/luci-static/resources/view/wechatpush/config.js:679
-msgid "Send notification after the first login and do not repeat within the specified time<br/>Take a shortcut and read the login time from the log"
-msgstr "首次登录后推送通知，在设定时间内不再重复提醒<br/>偷懒一下，登录时间从日志中读取，请确保开启日志功能"
+msgid "Send a notification on the first eligible login, then suppress repeated notifications from the same IP for the configured interval. Web and SSH share this interval.<br/>Timing is independent of logs and starts only after a successful notification."
+msgstr "首次符合条件的登录推送后，同一 IP 在设定时间内不重复提醒。Web 与 SSH 共用此时段。<br/>计时独立于日志，仅在通知成功发送后开始。"
 
 #: applications/luci-app-wechatpush/htdocs/luci-static/resources/view/wechatpush/config.js:682
 msgid "Login Alert (Auto-Ban) Whitelist"
@@ -852,12 +852,12 @@ msgid "Login reminder log anti-flooding"
 msgstr "登录提醒日志免刷屏"
 
 #: applications/luci-app-wechatpush/htdocs/luci-static/resources/view/wechatpush/config.js:690
-msgid "Users in the whitelist or during the undisturbed time period after their first login IP will be exempt from log recording, preventing log flooding."
-msgstr "白名单列表内的用户，或者登录 IP 处于首次登录后的免打扰时段，不做日志记录，避免日志刷屏"
+msgid "In first-login notification mode, log the first notification but skip repeated logins during the suppression interval.<br/>This option only affects logs, not notifications or suppression timing. Log-only mode records every login, including whitelist IPs."
+msgstr "仅在首次登录推送模式下生效：首次通知仍记录日志，免打扰时段内的重复登录不记录。<br/>此选项只影响日志，不改变推送规则和免打扰计时。“仅记录到日志”模式始终记录每次登录，包括白名单 IP。"
 
 #: applications/luci-app-wechatpush/htdocs/luci-static/resources/view/wechatpush/config.js:688
-msgid "Add the IP addresses in the list to the whitelist for the blocking function (if available), and ignore automatic blocking and login event notifications. Only record in the log. Mask notation is currently not supported."
-msgstr "列表内 IP 加入封禁功能白名单(如果可用)，并忽略自动封禁和登录事件推送，仅在日志中记录，暂不支持掩码位表示"
+msgid "IPs in this list are exempt from automatic blocking. Login notifications and logging follow the Login Reminder Do Not Disturb and Login Reminder Log Anti-Flooding settings. Only individual IP addresses are supported, not subnets or mask notation."
+msgstr "名单内 IP 免自动封禁。是否推送登录提醒、是否记录日志，分别按“登录提醒免打扰”和“登录提醒日志免刷屏”设置执行。仅支持单个 IP 地址，不支持网段或掩码写法。"
 
 #: applications/luci-app-wechatpush/htdocs/luci-static/resources/view/wechatpush/advanced.js:17
 msgid "If you are not familiar with the meanings of these options, please do not modify them.<br/><br/>"

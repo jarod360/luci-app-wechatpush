@@ -129,6 +129,7 @@ jobs:
           python tests/test_tplink.py
           node tests/test_tplink_ui.js
           bash tests/test_tplink_down.sh
+          bash tests/test_login_notifications.sh
           bash tests/test_offline_parameters.sh
           bash tests/test_device_aliases.sh
           bash tests/test_utf8.sh

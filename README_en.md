@@ -101,7 +101,7 @@ To install a package built by this repository's GitHub Actions, download the mat
 opkg install ./luci-app-wechatpush_3.6.20_all.ipk
 ```
 
-The older SDK records the IPK package version as `3.6.20`. If an earlier revision of that version is already installed, use `opkg --force-reinstall install ./luci-app-wechatpush_3.6.20_all.ipk` for r7 and update the matching language package. APK builds carry the separate `-r7` revision.
+The older SDK records the IPK package version as `3.6.20`. If an earlier revision of that version is already installed, use `opkg --force-reinstall install ./luci-app-wechatpush_3.6.20_all.ipk` for r8 and update the matching language package. APK builds carry the separate `-r8` revision.
 
 Optional dependencies:
 
@@ -142,3 +142,14 @@ Revision **r4** hides the trailing `.lan` suffix (case-insensitive) in automatic
 Revision **r5** standardizes help-text width and wrapping for fork additions while preserving theme form alignment and typography.
 
 Revision **r7** handles display width and name clipping using Unicode codepoints in jq instead of Bash byte slicing, including jq builds without regex support. Target QWRT regressions pass. A reported pre-send JSON already contained a replacement character; the intermittent historical cause has not been reproduced or conclusively identified.
+
+### Login notification modes (r8)
+
+The login whitelist exempts IPs from automatic blocking, not notifications. Enabled login events follow the selected mode:
+
+- **Off**: notify for each eligible event.
+- **Log only**: record every eligible event, including whitelist IPs, without sending a notification. The global logging switch still applies.
+- **First login only**: after a successful send, suppress the same IP for the configured interval. Repeats do not extend it; the next login after expiry may notify. Web and SSH share the IP window.
+- **Log anti-flooding**: shown and applied only in first-login mode. Keep the first event log and omit repeats during the window. Disabling it records repeats without resending notifications.
+
+Timing is independent of logs. Failed sends or global DND do not start a notification window. RAM state in `/tmp/wechatpush/login_notice_times.json` is mode 600, bounded to 256 IPs and cleared on reboot. Failed-login counters, blocking thresholds and whitelist blocking exemptions remain in place.
