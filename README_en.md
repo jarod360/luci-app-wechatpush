@@ -101,7 +101,7 @@ To install a package built by this repository's GitHub Actions, download the mat
 opkg install ./luci-app-wechatpush_3.6.20_all.ipk
 ```
 
-The older SDK records the IPK package version as `3.6.20`. If an earlier revision of that version is already installed, use `opkg --force-reinstall install ./luci-app-wechatpush_3.6.20_all.ipk` for r10 and update the matching language package. APK builds carry the separate `-r10` revision.
+The older SDK records the IPK package version as `3.6.20`. If an earlier revision of that version is already installed, use `opkg --force-reinstall install ./luci-app-wechatpush_3.6.20_all.ipk` for r11 and update the matching language package. APK builds carry the separate `-r11` revision.
 
 Optional dependencies:
 
@@ -157,3 +157,11 @@ Timing is independent of logs. Failed sends or global DND do not start a notific
 Revision **r9** fills missing TP-LINK client IPv4 display addresses by MAC from the QWRT online-device table, then an unambiguous host hint. Offline device records are excluded; valid TP-LINK IPs retain priority. The resolved IP also supports alias lookup. This is display-only and adds no polling or presence changes.
 
 Revision **r10** improves the original online-device list with alias-first QWRT host hints and saved-name fallback. Automatic .lan suffixes are hidden and missing names display as 未命名. Regular backend scans share one host-hint query and refresh names for TP-LINK-managed online clients instead of skipping metadata on early return. Fast detection rounds do not repeat the query; internal unknown presence states are unchanged.
+
+### UTF-8 command-substitution compatibility (r11)
+
+Bash 5.1.4 on the target QWRT reproduced corruption when a UTF-8 character crossed a 512-byte command-substitution read boundary. GNU [patch bash51-014](https://ftp.gnu.org/gnu/bash/bash-5.1-patches/bash51-014) documents the underlying defect. Five fresh processes passed 810 boundary comparisons with the application workaround.
+
+WeChatPush preserves the original language choice before setting its own process environment to `LC_ALL=C`; Lua/JSON still handle Unicode. This does not replace system Bash or change global language settings. Background outputs use literal variable assignment instead of re-evaluating content as shell code.
+
+The latest scheduled raw client list, assembled body, encoded payload, title and timestamp are retained separately in `/tmp/wechatpush/scheduled_diagnostics/`. Offline diagnostics remain in `push_diagnostics/`. Snapshots overwrite prior data, contain no request URL/auth token, use directory mode 700/file mode 600 and disappear on reboot. A raw client-list file is produced only when one is present.

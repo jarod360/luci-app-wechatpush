@@ -123,7 +123,7 @@
 opkg install ./luci-app-wechatpush_3.6.20_all.ipk
 ```
 
-旧版 SDK 生成的 IPK 包内版本仍为 `3.6.20`。若已安装同版本的早期修订，更新 r10 时请使用 `opkg --force-reinstall install ./luci-app-wechatpush_3.6.20_all.ipk`，并更新对应中文语言包。APK 产物包含独立的 `-r10` 修订号。
+旧版 SDK 生成的 IPK 包内版本仍为 `3.6.20`。若已安装同版本的早期修订，更新 r11 时请使用 `opkg --force-reinstall install ./luci-app-wechatpush_3.6.20_all.ipk`，并更新对应中文语言包。APK 产物包含独立的 `-r11` 修订号。
 
 可选依赖：
 
@@ -179,3 +179,11 @@ bash -x /usr/share/wechatpush/wechatpush t1
 修订 **r9**：TP-LINK 在线客户端弹窗在 TP-LINK 未提供有效 IPv4 地址时，按 MAC 匹配 QWRT 在线设备表，再尝试唯一的主机提示地址；不会使用离线设备记录补全，不覆盖 TP-LINK 已提供的有效 IP。补全后的地址也用于 IP 别名匹配；仅影响显示，不增加轮询或修改在线判定。
 
 修订 **r10**：原在线设备列表增加别名优先、QWRT 主机提示和已保存名称回退；自动名称去除末尾 `.lan`，无有效名称显示“未命名”。后台常规扫描批量读取一次主机提示，并修复 TP-LINK 已管理在线设备提前返回、漏掉后续名称刷新的问题；不在快速检测轮次重复读取主机提示，不改变在线判定。内部 `unknown` 状态仍保留原含义。
+
+### 旧 Bash 的 UTF-8 边界兼容（r11）
+
+目标 QWRT 的 Bash 5.1.4 在 UTF-8 命令替换输出跨越 512 字节缓冲区边界时可损坏字符；GNU 官方补丁 [bash51-014](https://ftp.gnu.org/gnu/bash/bash-5.1-patches/bash51-014) 修复了这类问题。已在目标路由器用原模式复现，并验证应用内兼容处理后，5 个独立进程的 810 次边界比对通过。
+
+WeChatPush 启动时保留原语言选择，再将自身及子进程的字符处理模式固定为 `LC_ALL=C`；中文内容仍由 Lua/JSON 按 UTF-8 处理，不修改系统全局语言或 Bash 程序。后台结果读取改用字面量赋值，避免把设备清单重新解析成 Shell 代码。
+
+定时推送另保留最近一份 `/tmp/wechatpush/scheduled_diagnostics/` 快照：`client_list.raw`、`body.html`、`payload.json`、标题与生成时间。离线快照仍使用 `push_diagnostics/`；两类分别覆盖，不累计历史，不含请求 URL/鉴权令牌，目录 700、文件 600，重启后消失。没有设备清单时不会生成新的 `client_list.raw`。

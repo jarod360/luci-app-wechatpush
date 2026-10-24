@@ -1,5 +1,15 @@
 #!/bin/bash
 
+# Bash 5.1 before patch 014 corrupts UTF-8 spanning a command-substitution
+# read boundary. Keep shell processing byte-oriented; JSON/Lua handle Unicode.
+# Preserve the caller's language before changing LC_ALL (including child runs).
+initialize_utf8_runtime() {
+	wechatpush_requested_locale="${wechatpush_requested_locale:-${LANG:-${LANGUAGE:-${LC_ALL:-${LC_MESSAGES:-zh_cn}}}}}"
+	export wechatpush_requested_locale
+	export LC_ALL=C
+}
+initialize_utf8_runtime
+
 # ------------------------------------
 # 配置、变量获取、初始化类
 #
@@ -9,7 +19,7 @@ get_config() {
 		[[ "$1" == "lang" ]] && {
 			lang=$(uci get luci.main.lang 2>/dev/null)
 			if [ -z "$lang" ] || [[ "$lang" == "auto" ]]; then
-				lang=$(echo "${LANG:-${LANGUAGE:-${LC_ALL:-${LC_MESSAGES:-zh_cn}}}}" | awk -F'[ .@]' '{print tolower($1)}' | sed 's/-/_/' 2>/dev/null)
+				lang=$(echo "${wechatpush_requested_locale:-${LANG:-${LANGUAGE:-${LC_ALL:-${LC_MESSAGES:-zh_cn}}}}}" | awk -F'[ .@]' '{print tolower($1)}' | sed 's/-/_/' 2>/dev/null)
 			fi
 		} || {
 			eval "${1}='$(uci get wechatpush.config.$1 2>/dev/null)'"
@@ -33,7 +43,8 @@ wait_and_cat() {
 	for file in "$output_dir"/*; do
 		local variable_name=$(basename "$file")
 		local variable_value=$(cat "$file")
-		eval "${variable_name}='${variable_value}'"
+		[[ "$variable_name" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] || continue
+		printf -v "$variable_name" '%s' "$variable_value"
 	done
 	if [ ! -f "${dir}/send_pid" ]; then
 		rm "$output_dir"/*
@@ -3329,6 +3340,8 @@ process_login() {
 #
 # 发送定时数据
 send() {
+	local push_kind=scheduled
+	[ -n "$1" ] && push_kind=test
 	pid=$$
 	echo "$pid" >"${dir}/send_pid"
 	log_change "[INFO] $(translate "Create scheduled task")"
@@ -3781,16 +3794,18 @@ diy_send() {
 		rm -f "$tempjsonpath"
 		return 1
 	fi
-	# Keep only the latest offline payload for local diagnosis; never save tokens/URLs.
-	if [ "${offline_push_pending:-0}" = 1 ] && [ "${#json_encoding[@]}" -gt 0 ]; then
+	# Bounded, separate snapshots for scheduled/offline notifications; no tokens/URLs.
+	if { [ "${offline_push_pending:-0}" = 1 ] || [ "${push_kind:-}" = scheduled ]; } && [ "${#json_encoding[@]}" -gt 0 ]; then
 		if jq -e '.. | strings | select(index("\ufffd"))' "$tempjsonpath" >/dev/null 2>&1; then
-			log_change "[WARN] 离线通知生成时已包含 Unicode 替换字符，请检查本地 push_diagnostics 快照"
+			log_change "[WARN] 推送生成时已包含 Unicode 替换字符，请检查本地诊断快照"
 		fi
 		local diagnostics="${dir}/push_diagnostics"
+		[ "${push_kind:-}" = scheduled ] && diagnostics="${dir}/scheduled_diagnostics"
 		if mkdir -p -m 700 "$diagnostics"; then
 			(umask 077; printf '%s' "$1" >"$diagnostics/title.txt";
 			 printf '%s' "$2" >"$diagnostics/body.html";
 			 cp "$tempjsonpath" "$diagnostics/payload.json";
+			 if [ "${push_kind:-}" = scheduled ] && [ -r "$output_dir/current_device" ]; then cp "$output_dir/current_device" "$diagnostics/client_list.raw"; else rm -f "$diagnostics/client_list.raw"; fi
 			 date '+%Y-%m-%d %H:%M:%S' >"$diagnostics/prepared_at")
 		fi
 	fi

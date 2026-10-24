@@ -135,6 +135,8 @@ jobs:
           bash tests/test_offline_parameters.sh
           bash tests/test_device_aliases.sh
           bash tests/test_utf8.sh
+          bash tests/test_command_substitution_utf8.sh
+          bash tests/test_scheduled_snapshot.sh
           bash tests/test_template_utf8.sh
           bash tests/test_push_concurrency.sh
 
