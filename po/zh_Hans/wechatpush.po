@@ -199,8 +199,8 @@ msgid "Thumbnail Image File Path"
 msgstr "图片缩略图文件路径"
 
 #: applications/luci-app-wechatpush/htdocs/luci-static/resources/view/wechatpush/config.js:181
-msgid "Supports JPG and PNG formats within 2MB <br> Optimal size: 900383 or 2.35:1"
-msgstr "只支持 2MB 以内 JPG、PNG 格式<br>最佳尺寸：900383 或 2.35:1"
+msgid "Supports JPG and PNG up to 2 MB.<br>For news messages, the recommended large image is 1068 x 455 and the small image is 150 x 150. This channel uses mpnews; actual cropping depends on the client. Keep text and icons centered with generous margins."
+msgstr "支持 2MB 以内的 JPG、PNG 图片。<br>news 图文消息推荐大图 1068×455、小图 150×150。本通道使用 mpnews，实际裁切以客户端为准；请将文字和图标置于中央，并预留充足边距。"
 
 #: applications/luci-app-wechatpush/htdocs/luci-static/resources/view/wechatpush/config.js:192
 msgid "topicIds(Mass sending)"

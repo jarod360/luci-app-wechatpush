@@ -101,7 +101,7 @@ To install a package built by this repository's GitHub Actions, download the mat
 opkg install ./luci-app-wechatpush_3.6.20_all.ipk
 ```
 
-The older SDK records the IPK package version as `3.6.20`. If an earlier revision of that version is already installed, use `opkg --force-reinstall install ./luci-app-wechatpush_3.6.20_all.ipk` for r11 and update the matching language package. APK builds carry the separate `-r11` revision.
+The older SDK records the IPK package version as `3.6.20`. If an earlier revision of that version is already installed, use `opkg --force-reinstall install ./luci-app-wechatpush_3.6.20_all.ipk` for r12 and update the matching language package. APK builds carry the separate `-r12` revision.
 
 Optional dependencies:
 
@@ -165,3 +165,7 @@ Bash 5.1.4 on the target QWRT reproduced corruption when a UTF-8 character cross
 WeChatPush preserves the original language choice before setting its own process environment to `LC_ALL=C`; Lua/JSON still handle Unicode. This does not replace system Bash or change global language settings. Background outputs use literal variable assignment instead of re-evaluating content as shell code.
 
 The latest scheduled raw client list, assembled body, encoded payload, title and timestamp are retained separately in `/tmp/wechatpush/scheduled_diagnostics/`. Offline diagnostics remain in `push_diagnostics/`. Snapshots overwrite prior data, contain no request URL/auth token, use directory mode 700/file mode 600 and disappear on reboot. A raw client-list file is produced only when one is present.
+
+### Notification cover update (r12)
+
+The default cover is the approved Chinese real-time alert artwork, 1068×455 and about 29.7 KB, with no visible watermark. Only `logo.jpg` is packaged; custom image paths retain their configured values. Size guidance distinguishes the news recommendation (1068×455 large, 150×150 small) from the mpnews channel used here and advises keeping essential content centered with cropping margins.

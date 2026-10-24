@@ -208,7 +208,7 @@ return view.extend({
 		o.rmempty = false;
 		o.default = '/usr/share/wechatpush/api/logo.jpg';
 		o.depends('jsonpath', '/usr/share/wechatpush/api/qywx_mpnews.json');
-		o.description = _('Supports JPG and PNG formats within 2MB <br> Optimal size: 900383 or 2.35:1');
+		o.description = _('Supports JPG and PNG up to 2 MB.<br>For news messages, the recommended large image is 1068 x 455 and the small image is 150 x 150. This channel uses mpnews; actual cropping depends on the client. Keep text and icons centered with generous margins.');
 
 		o = s.taboption('basic', form.Value, 'qywx_api_url', _('WeChat Work API Base URL'));
 		o.placeholder = 'https://qyapi.weixin.qq.com';
