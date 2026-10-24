@@ -23,4 +23,8 @@ diy_send '定时推送' "$current_device" "$jsonpath" || exit 1
 [ "$(cat "$dir/scheduled_diagnostics/client_list.raw")" = "$expected" ] || exit 1
 [ "$(jq -r '.mpnews.articles[0].content' "$dir/scheduled_diagnostics/payload.json")" = "$expected" ] || exit 1
 if grep -Rq 'fixture-token\|example.invalid' "$dir/scheduled_diagnostics"; then exit 1; fi
+rm "$output_dir/current_device"
+diy_send '定时推送' "$expected" "$jsonpath" || exit 1
+[ ! -e "$dir/scheduled_diagnostics/client_list.raw" ] || { echo 'FAIL: stale scheduled raw list retained'; exit 1; }
+[ "$(cat "$dir/scheduled_diagnostics/body.html")" = "$expected" ] || exit 1
 echo 'PASS: scheduled raw list/body/JSON round-trip literal quotes and Unicode; diagnostics contain no URL/token; no network send'
