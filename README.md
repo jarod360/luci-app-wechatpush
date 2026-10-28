@@ -82,7 +82,6 @@
 
 修订 **r3** 补充发送并发修复和名称回退：每次发送使用独立的权限 600 临时 JSON，避免设备、登录和定时通知相互覆盖，或被主循环清理；企业微信请求使用等价的 ASCII Unicode 转义传递中文、箭头和 emoji。并发回归测试在目标 QWRT 上验证了 12 条约 25KB 消息，网络发送使用测试桩。
 
-为核验偶发乱码，最近一次离线通知的标题、原始正文、JSON 和时间保留于 `/tmp/wechatpush/push_diagnostics/`，目录权限 700，不保存请求 URL、Cookie 或鉴权令牌；只保留一份并在下一次离线通知时覆盖，重启后消失。该诊断记录只在离线推送时写入，不按轮询持续积累。
 
 - 修复 QWRT Bash/musl 下中文、箭头、emoji 的 UTF-8 字节读取问题，避免设备名称或流量排版偶发出现 `�`。
 - 修复别名中 `%`、引号和 MAC/IP 前缀匹配问题，安全生成新设备 JSON。
@@ -123,7 +122,7 @@
 opkg install ./luci-app-wechatpush_3.6.20_all.ipk
 ```
 
-旧版 SDK 生成的 IPK 包内版本仍为 `3.6.20`。若已安装同版本的早期修订，更新 r12 时请使用 `opkg --force-reinstall install ./luci-app-wechatpush_3.6.20_all.ipk`，并更新对应中文语言包。APK 产物包含独立的 `-r12` 修订号。
+旧版 SDK 生成的 IPK 包内版本仍为 `3.6.20`。若已安装同版本的早期修订，更新 r13 时请使用 `opkg --force-reinstall install ./luci-app-wechatpush_3.6.20_all.ipk`，并更新对应中文语言包。APK 产物包含独立的 `-r13` 修订号。
 
 可选依赖：
 
@@ -186,8 +185,9 @@ bash -x /usr/share/wechatpush/wechatpush t1
 
 WeChatPush 启动时保留原语言选择，再将自身及子进程的字符处理模式固定为 `LC_ALL=C`；中文内容仍由 Lua/JSON 按 UTF-8 处理，不修改系统全局语言或 Bash 程序。后台结果读取改用字面量赋值，避免把设备清单重新解析成 Shell 代码。
 
-定时推送另保留最近一份 `/tmp/wechatpush/scheduled_diagnostics/` 快照：`client_list.raw`、`body.html`、`payload.json`、标题与生成时间。离线快照仍使用 `push_diagnostics/`；两类分别覆盖，不累计历史，不含请求 URL/鉴权令牌，目录 700、文件 600，重启后消失。没有设备清单时不会生成新的 `client_list.raw`。
 
 ### 推送封面调整（r12）
 
 默认封面更新为已在微信客户端确认显示效果的“实时提醒”图片，尺寸 1068×455，约 29.7 KB，无可见水印。仓库仅保留 `logo.jpg`；自定义图片路径继续使用用户配置。尺寸提示区分 news 推荐的大图 1068×455、小图 150×150 与本通道使用的 mpnews，提醒客户端可能裁切，文字和图标应集中并保留边距。
+
+修订 **r13**：移除仅供乱码排查的定时与离线诊断快照写入；保留 UTF-8 修复、并发隔离及轻量替换字符告警。
