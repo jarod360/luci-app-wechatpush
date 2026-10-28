@@ -10,7 +10,7 @@
 
 **luci-app-wechatpush** is an OpenWrt LuCI plugin for network monitoring and notifications. This repository is a maintained fork of [tty228/luci-app-wechatpush](https://github.com/tty228/luci-app-wechatpush). It retains the upstream notification and monitoring functions while adding QWRT-native traffic and online detection, IP geolocation lookup, batched device-event notifications, and compatibility fixes.
 
-Current package version: **3.6.20-3**
+Current package version: **3.6.20-13**
 
 ## Features
 
