@@ -22,7 +22,7 @@ get_config() {
 				lang=$(echo "${wechatpush_requested_locale:-${LANG:-${LANGUAGE:-${LC_ALL:-${LC_MESSAGES:-zh_cn}}}}}" | awk -F'[ .@]' '{print tolower($1)}' | sed 's/-/_/' 2>/dev/null)
 			fi
 		} || {
-			eval "${1}='$(uci get wechatpush.config.$1 2>/dev/null)'"
+			printf -v "$1" '%s' "$(uci get "wechatpush.config.$1" 2>/dev/null)"
 		}
 		shift
 	done
