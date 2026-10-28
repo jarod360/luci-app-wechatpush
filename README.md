@@ -10,7 +10,7 @@
 
 **luci-app-wechatpush** 是一个 OpenWrt LuCI 网络监控与消息通知插件。本仓库是基于上游 [tty228/luci-app-wechatpush](https://github.com/tty228/luci-app-wechatpush) 持续维护的 fork，在保留原有通知和监控功能的基础上，进一步扩展了 QWRT 原生流量与在线检测、IP 归属地查询、设备事件合并推送及多项兼容性修复。
 
-当前软件包版本：**3.6.20-3**
+当前软件包版本：**3.6.20-13**
 
 ## 主要功能
 
