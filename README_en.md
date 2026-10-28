@@ -10,7 +10,7 @@
 
 **luci-app-wechatpush** is an OpenWrt LuCI plugin for network monitoring and notifications. This repository is a maintained fork of [tty228/luci-app-wechatpush](https://github.com/tty228/luci-app-wechatpush). It retains the upstream notification and monitoring functions while adding QWRT-native traffic and online detection, IP geolocation lookup, batched device-event notifications, and compatibility fixes.
 
-Current package version: **3.6.20-13**
+Current package version: **3.6.20-14**
 
 ## Features
 
@@ -97,10 +97,10 @@ The package architecture is `all`. OpenWrt's package manager resolves the requir
 To install a package built by this repository's GitHub Actions, download the matching artifact and run, for example:
 
 ```sh
-opkg install ./luci-app-wechatpush_3.6.20_all.ipk
+opkg install ./luci-app-wechatpush_3.6.20-r14_all.ipk
 ```
 
-The older SDK records the IPK package version as `3.6.20`. If an earlier revision of that version is already installed, use `opkg --force-reinstall install ./luci-app-wechatpush_3.6.20_all.ipk` for r13 and update the matching language package. APK builds carry the separate `-r13` revision.
+Starting with r14, CI includes the revision in both IPK and APK package versions (for example `3.6.20-r14`) and verifies the actual IPK metadata and core assets. This prevents older LuCI SDKs from silently ignoring PKG_RELEASE and skipping an apparent same-version upgrade. Install the matching language package; custom configuration, aliases and image paths are preserved.
 
 Optional dependencies:
 
@@ -169,3 +169,9 @@ WeChatPush preserves the original language choice before setting its own process
 The default cover is the approved Chinese real-time alert artwork, 1068×455 and about 29.7 KB, with no visible watermark. Only `logo.jpg` is packaged; custom image paths retain their configured values. Size guidance distinguishes the news recommendation (1068×455 large, 150×150 small) from the mpnews channel used here and advises keeping essential content centered with cropping margins.
 
 Revision **r13** removes scheduled/offline diagnostic snapshots, retaining UTF-8 fixes, concurrency isolation and lightweight replacement-character warnings.
+
+### Runtime boundaries and upgrades (r14)
+
+Scheduled/test sends now use private collection directories and serialized sends without deleting pending daemon events or rebuilding cron. Overnight pause windows wait correctly until their end. Traffic alerts normalize the actual sampling interval to one minute, use the current device name, and bound native statistics RPCs to two seconds. Missing location fields retain their positions so ISP names do not become city names. Removed diagnostic snapshots remain removed. Tests run only in source/CI or isolated temporary staging directories.
+
+See [the r14 review record](docs/code-review-r14.md) for scope and limits.

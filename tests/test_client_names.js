@@ -1,6 +1,8 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const acl = JSON.parse(fs.readFileSync(path.join(__dirname, '../root/usr/share/rpcd/acl.d/luci-app-wechatpush.json'), 'utf8'));
+assert.ok(acl['luci-app-wechatpush'].read.ubus['luci.client-rates'].includes('get'));
 const source = fs.readFileSync(path.join(__dirname, '../htdocs/luci-static/resources/view/wechatpush/client.js'), 'utf8');
 let hintCalls = 0;
 const hints = {'AA-BB-CC-DD-EE-FF': {name:'iQOO-15.lan',ipaddrs:['192.0.2.1']}};

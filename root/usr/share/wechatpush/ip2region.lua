@@ -76,13 +76,14 @@ if not region then close_and_fail() end
 file:close()
 file = nil
 local fields = {}
+local function usable(field)
+ local lower = (field or ''):lower()
+ return field and field ~= '' and lower ~= '0' and lower ~= 'null' and lower ~= 'unknown' and lower ~= 'n/a'
+  and field ~= '未知' and field ~= '保留地址' and field ~= '内网IP'
+end
 for field in (region .. "|"):gmatch("(.-)|") do
-	field = field:gsub("^%s*(.-)%s*$", "%1")
-	local lower = field:lower()
-	if field ~= "" and lower ~= "0" and lower ~= "null" and lower ~= "unknown" and lower ~= "n/a"
-		and field ~= "未知" and field ~= "保留地址" and field ~= "内网IP" then
-		fields[#fields + 1] = field
-	end
+ -- Preserve missing positions so an ISP cannot shift into the city field.
+ fields[#fields + 1] = field:gsub("^%s*(.-)%s*$", "%1")
 end
 if #fields == 0 then fail() end
 
@@ -97,7 +98,9 @@ local continents = {
 	["大洋洲"] = true, ["oceania"] = true,
 	["南极洲"] = true, ["antarctica"] = true
 }
-if continents[(fields[1] or ""):lower()] then table.remove(fields, 1) end
+local has_continent = continents[(fields[1] or ""):lower()]
+if has_continent then table.remove(fields, 1)
+elseif fields[2] == "0" then table.remove(fields, 2) end -- legacy country|0|province|city|ISP
 
 local country = fields[1] or ""
 local country_lower = country:lower()
@@ -106,16 +109,19 @@ local is_mainland_china = country == "中国" or country_lower == "china"
 if is_mainland_china then
 	-- 中国大陆：国家|省|市|县区|运营商。保留省级和市级，兼容缺少省级字段的旧数据。
 	local province, city = fields[2], fields[3]
-	if province and province ~= "" and city and city ~= "" then
+	if usable(province) and usable(city) then
 		fields = { province, city }
-	elseif city and city ~= "" then
+	elseif usable(city) then
 		fields = { city }
+	elseif usable(province) then
+		fields = { province }
 	else
 		fail()
 	end
 else
 	-- 其他国家/地区：保留国家/地区及市级，丢弃其余行政层级和网络运营商信息。
 	local city = (#fields >= 4 and fields[3]) or fields[2]
-	if city and city ~= "" then fields = { country, city } else fields = { country } end
+	if not usable(country) then fail() end
+	if usable(city) then fields = { country, city } else fields = { country } end
 end
 io.write(table.concat(fields, " "))

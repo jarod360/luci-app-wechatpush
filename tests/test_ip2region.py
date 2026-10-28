@@ -74,6 +74,17 @@ with tempfile.TemporaryDirectory() as tmp:
     assert result.returncode == 0
     assert result.stdout == "United States Los Angeles", result.stdout
 
+    for index, (region, expected) in enumerate([
+        ("中国|0|四川省|成都市|电信", "四川省 成都市"),
+        ("亚洲|中国|四川省|0|0|电信", "四川省"),
+        ("亚洲|中国|0|成都市|0|电信", "成都市"),
+        ("Europe|United States|0|Los Angeles|0|Example ISP", "United States Los Angeles"),
+    ]):
+        fixture = tmp / ("missing-fields-%d.xdb" % index)
+        write_xdb(fixture, region)
+        result = lookup(fixture)
+        assert result.returncode == 0 and result.stdout == expected, (region, result.stdout)
+
     missing = lookup(legacy_db, "1.2.3.5")
     assert missing.returncode != 0 and not missing.stdout, (
         missing.returncode, missing.stdout, missing.stderr

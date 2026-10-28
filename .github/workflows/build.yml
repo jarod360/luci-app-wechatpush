@@ -138,6 +138,7 @@ jobs:
           bash tests/test_command_substitution_utf8.sh
           bash tests/test_template_utf8.sh
           bash tests/test_push_concurrency.sh
+          bash tests/test_runtime_edges.sh
 
   build-apk:
     name: Build APK (v25.12)
@@ -399,7 +400,13 @@ jobs:
       - name: Compile the package
         working-directory: ${{ env.SDK_DIR }}
         run: |
+          # The 23.05 LuCI recipe ignores PKG_RELEASE in its package VERSION.
+          # Include the revision only in this package copy for the legacy SDK.
+          version=$(sed -n 's/^PKG_VERSION:=//p' "${{ github.workspace }}/Makefile")
+          revision=$(sed -n 's/^PKG_RELEASE:=//p' "${{ github.workspace }}/Makefile")
+          sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=${version}-r${revision}/" "package/${PACKAGE_NAME}/Makefile"
           make package/${PACKAGE_NAME}/compile V=s -j$(($(nproc) + 1))
+          python3 "${{ github.workspace }}/tests/check_ipk.py" ./bin/packages "${{ github.workspace }}"
 
       - name: Find and prepare .ipk file
         id: find_ipk

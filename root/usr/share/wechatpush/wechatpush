@@ -124,8 +124,12 @@ read_config() {
 	[ -z "$login_ip_white_timeout" ] && login_ip_white_timeout="600"
 	[ "$iw_version" ] && wlan_interface=$(iw dev 2>/dev/null | grep Interface | awk '{print $2}') >/dev/null 2>&1
 	[ -z "$server_port" ] && server_port="22"
-	output_dir="${dir}/json_output"
-	mkdir -p "$output_dir"
+	if [ "$1" = "send" ] || [ "$1" = "test" ]; then
+		output_dir=$(mktemp -d "${dir}/config-output.XXXXXX") || return 1
+	else
+		output_dir="${dir}/json_output"
+		mkdir -p "$output_dir"
+	fi
 	# 企业微信图文消息必须保留 HTML 标题标签，确保正文中的所有标题文字加粗。
 	# 其他推送渠道继续遵循原有 lite_enable 精简格式逻辑。
 	if { (echo "$lite_enable" | grep -q "content") && [[ "$jsonpath" != *"/qywx_mpnews.json" ]]; } || [ -z "$jsonpath" ]; then
@@ -141,8 +145,13 @@ read_config() {
 	fi
 	wait_and_cat
 	disturb_text=$_api
-	deltemp
-	cron
+	# One-shot sends must not clear the daemon's pending events or restart cron.
+	if [ "$1" != "send" ] && [ "$1" != "test" ]; then
+		deltemp
+		cron
+	else
+		rmdir "$output_dir" 2>/dev/null
+	fi
 }
 
 get_signal_dbm() {
@@ -353,7 +362,7 @@ main() {
 			devices_json="${dir}/devices.json"
 			ip_changes getip && exit $?
 		}
-		silent_run read_config
+		silent_run read_config "$1"
 		[ "$1" == "send" ] && {
 			send
 			exit $?
@@ -1352,7 +1361,7 @@ qwrt_traffic_for_ip() {
 	local ip="$1" mode="${2:-full}" response mac upload download total
 	[ "$qwrt_traffic_enable" = "1" ] || return 1
 	[[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || return 1
-	response=$(ubus call luci.client-rates get "$(jq -nc --arg ip "$ip" '{addresses:[$ip]}')" 2>/dev/null) || return 1
+	response=$(ubus -t 2 call luci.client-rates get "$(jq -nc --arg ip "$ip" '{addresses:[$ip]}')" 2>/dev/null) || return 1
 	mac=$(printf '%s' "$response" | jq -r --arg ip "$ip" '.rates[$ip].mac // empty' 2>/dev/null)
 	[ -n "$mac" ] || return 1
 	mac=$(printf '%s' "$mac" | tr '[:lower:]' '[:upper:]')
@@ -1377,7 +1386,7 @@ get_qwrt_usage_stats() {
 	[ "$qwrt_traffic_enable" = "1" ] && [ -n "$mac" ] || return 1
 	ip=$(jq -r --arg mac "$mac" '.devices[] | select(.status == "online" and ((.mac // "") | ascii_downcase) == ($mac | ascii_downcase)) | .ip' "$devices_json" | head -n1)
 	[[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || return 1
-	response=$(ubus call luci.client-rates get "$(jq -nc --arg ip "$ip" '{addresses:[$ip]}')" 2>/dev/null) || return 1
+	response=$(ubus -t 2 call luci.client-rates get "$(jq -nc --arg ip "$ip" '{addresses:[$ip]}')" 2>/dev/null) || return 1
 	rate_mac=$(printf '%s' "$response" | jq -r --arg ip "$ip" '.rates[$ip].mac // empty' 2>/dev/null)
 	[ -n "$rate_mac" ] || rate_mac="$mac"
 	rate_mac=$(printf '%s' "$rate_mac" | tr '[:lower:]' '[:upper:]')
@@ -1400,12 +1409,24 @@ enable_detection() {
 	unset i
 }
 
+# Pure hour-window check; an equal start/end preserves the all-day window.
+in_disturb_window() {
+	local hour="$1" start="$2" end="$3"
+	[[ "$hour" =~ ^[0-9]+$ && "$start" =~ ^[0-9]+$ && "$end" =~ ^[0-9]+$ ]] || return 1
+	[ "$hour" -le 23 ] && [ "$start" -le 23 ] && [ "$end" -le 23 ] || return 1
+	if [ "$start" -lt "$end" ]; then
+		[ "$hour" -ge "$start" ] && [ "$hour" -lt "$end" ]
+	else
+		[ "$hour" -ge "$start" ] || [ "$hour" -lt "$end" ]
+	fi
+}
+
 # 免打扰检测
 disturb() {
 	[ -z "$do_not_disturb_mode" ] || [ -z "$do_not_disturb_starttime" ] || [ -z "$do_not_disturb_endtime" ] && return 0
 
 	# 非免打扰时间
-	if [ $(date +%H) -ge $do_not_disturb_endtime -a $do_not_disturb_starttime -lt $do_not_disturb_endtime ] || [ $(date +%H) -lt $do_not_disturb_starttime -a $do_not_disturb_starttime -lt $do_not_disturb_endtime ] || [ $(date +%H) -lt $do_not_disturb_starttime -a $(date +%H) -ge $do_not_disturb_endtime -a $do_not_disturb_starttime -gt $do_not_disturb_endtime ]; then
+	if ! in_disturb_window "$(date +%H)" "$do_not_disturb_starttime" "$do_not_disturb_endtime"; then
 		unset sheep_starttime
 		rm -f ${dir}/sheep_usage ${dir}/old_sheep_usage 2>/dev/null
 		[ -z "$jsonpath" ] && disturb_text="[INFO]"
@@ -1416,10 +1437,12 @@ disturb() {
 		[ -z "$sheep_starttime" ] && log_change "[DND] $(translate "It's late at night, time to rest")" && sheep_starttime=$(date +%s)
 		# 挂起
 		if [ "$do_not_disturb_mode" -eq "1" ]; then
-			while [ $(date +%H) -lt "$do_not_disturb_endtime" ]; do
+			while in_disturb_window "$(date +%H)" "$do_not_disturb_starttime" "$do_not_disturb_endtime"; do
 				enable_detection
 				sleep $sleeptime
 			done
+			unset sheep_starttime
+			[ -z "$jsonpath" ] && disturb_text="[INFO]" || disturb_text=$(jq -r '._api' "$jsonpath")
 		# 静默
 		elif [ "$do_not_disturb_mode" -eq "2" ]; then
 			disturb_text="[DND]"
@@ -2654,6 +2677,8 @@ get_client_usage() {
 	[ -z "$client_usage_max" ] && return
 
 	[ -z "$get_client_usage_time" ] && get_client_usage_time=$(date +%s)
+	local sample_now=$(date +%s)
+	local sample_elapsed=$((sample_now - get_client_usage_time))
 	(echo $client_usage_max | sed -r 's/.*(.)$/\1/' | grep -q "K\|k") && client_usage_max=$(expr ${client_usage_max%?} \* 1024)
 	(echo $client_usage_max | sed -r 's/.*(.)$/\1/' | grep -q "M\|m") && client_usage_max=$(expr ${client_usage_max%?} \* 1048576)
 	(echo $client_usage_max | sed -r 's/.*(.)$/\1/' | grep -q "G\|g") && client_usage_max=$(expr ${client_usage_max%?} \* 1073741824)
@@ -2662,7 +2687,7 @@ get_client_usage() {
 	[ "$client_usage_disturb" -eq "1" ] && [ -n "$client_usage_whitelist" ] && local MACLIST=$(echo "$client_usage_whitelist")
 	[ -z "$MACLIST" ] && return
 
-	if [ "$(($(date +%s) - $get_client_usage_time))" -ge "60" ]; then
+	if [ "$sample_elapsed" -ge 60 ]; then
 		>${dir}/client_usage_aliases
 		for mac in $MACLIST; do
 			local cur_total cur_upload cur_download cur_has_direction usage_stats
@@ -2678,17 +2703,18 @@ get_client_usage() {
 			[ -z "$prev_total" ] && prev_total="0"
 			local delta_total=$((cur_total - prev_total))
 			[ "$delta_total" -lt "0" ] && continue
-			if [ "$delta_total" -ge "$client_usage_max" ]; then
+			local minute_total=$((delta_total * 60 / sample_elapsed))
+			if [ "$minute_total" -ge "$client_usage_max" ]; then
 				local ip=$(jq -r --arg mac "$mac" '.devices[] | select((.mac | ascii_downcase) == ($mac | ascii_downcase) and .status == "online") | .ip' "$devices_json")
 				local ip_name=$(getname ${ip} ${mac})
-				local tmp_usage=$(bytes_for_humans "$delta_total")
+				local tmp_usage=$(bytes_for_humans "$minute_total")
 				local time_up=$(jq -r --arg mac "$mac" '.devices[] | select((.mac | ascii_downcase) == ($mac | ascii_downcase) and .status == "online") | .uptime' "$devices_json")
 				local ip_total=$(bytes_for_humans "$cur_total") && [ -n "$ip_total" ] && local ip_total="${str_linefeed}${str_tab} - $(translate "Total Traffic:") $(field_spaces 4)${ip_total}"
 				local time1=$(date +%s)
 				local time1=$(time_for_humans $(expr ${time1} - ${time_up}))
 				
 				if [ -z "$title" ]; then
-					title=$(translate "%s abnormal traffic" "$name")
+					title=$(translate "%s abnormal traffic" "$ip_name")
 					local content_title="${str_splitline}${str_title_start}$(translate "Device abnormal traffic")${str_title_end}"
 				elif echo "$title" | grep -q "$(translate "abnormal traffic")"; then
 					title="${ip_name} ${title}"
@@ -2706,6 +2732,8 @@ get_client_usage() {
 					local delta_download=$((cur_download - prev_download))
 					[ "$delta_upload" -lt "0" ] && delta_upload="0"
 					[ "$delta_download" -lt "0" ] && delta_download="0"
+					delta_upload=$((delta_upload * 60 / sample_elapsed))
+					delta_download=$((delta_download * 60 / sample_elapsed))
 					detail_upload="${str_linefeed}${str_tab} - $(translate "Upload Traffic:")$(field_spaces 2)$(bytes_for_humans "$delta_upload")"
 					detail_download="${str_linefeed}${str_tab} - $(translate "Download Traffic:")${str_space}$(bytes_for_humans "$delta_download")"
 				fi
@@ -2725,7 +2753,7 @@ ${str_linefeed}${str_tab} - $(translate "Uptime:")$(field_spaces 4)${time1}${det
 			fi
 		done
 		cat ${dir}/client_usage_aliases >${dir}/old_client_usage_aliases
-		get_client_usage_time=$(date +%s)
+		get_client_usage_time="$sample_now"
 	fi
 }
 
@@ -3339,7 +3367,21 @@ process_login() {
 # 信息推送相关
 #
 # 发送定时数据
+finish_send() {
+	# output_dir is a private mktemp directory owned by this invocation.
+	rm -f "$output_dir"/*
+	rmdir "$output_dir" 2>/dev/null
+	if [ "$(cat "${dir}/send_pid" 2>/dev/null)" = "$$" ]; then
+		rm -f "${dir}/send_pid" "${dir}/send_enable.lock"
+	fi
+	exec {send_fd}>&-
+}
+
 send() {
+	local send_fd output_dir
+	exec {send_fd}>"${dir}/scheduled_send.lock" || return 1
+	flock -n "$send_fd" || { exec {send_fd}>&-; return 1; }
+	output_dir=$(mktemp -d "${dir}/send-output.XXXXXX") || { exec {send_fd}>&-; return 1; }
 	local push_kind=scheduled
 	[ -n "$1" ] && push_kind=test
 	pid=$$
@@ -3348,7 +3390,7 @@ send() {
 	>"${dir}/send_enable.lock"
 	disturb
 	disturb_RETVAL=$?
-	[ "$disturb_RETVAL" -ne "0" ] && log_change "${disturb_text} $(translate "Do not disturb time, exit scheduled push")" && return
+	[ "$disturb_RETVAL" -ne "0" ] && { log_change "${disturb_text} $(translate "Do not disturb time, exit scheduled push")"; finish_send; return 0; }
 	get_config "send_title" "send_notification"
 
 	[ -z "$1" ] && cpu_load=$(getcpu)
@@ -3400,7 +3442,6 @@ ${str_tab} - $(translate "Device 4")"
 	wait_and_cat
 	[ -z "$1" ] && (echo "$send_notification" | grep -q "client_list") && current_device & # 设备列表需等待 first & 完成
 
-	[ "$disturb_RETVAL" -ne "0" ] && log_change "${disturb_text} $(translate "Do not disturb time, exit scheduled push")" && return
 	if [ -z "$1" ] && [ -n "$systeminfo_enable" ]; then
 		[[ $Qwai -eq 200 || $Qwai -eq 301 || $Qwai -eq 302 ]] && Qwai_status="$(translate "Connected!")" || Qwai_status="$(translate "Disconnected!")"
 		send_content="${send_content}\
@@ -3509,9 +3550,8 @@ ${str_splitline}"
 
 	diy_send "${send_title}" "${send_content}" "${jsonpath}" "$1"
 	RETVAL=$?
-	[ $RETVAL -eq 1 ] && log_change "[ERROR] $(translate "Scheduled push failed, please check network or settings")" || log_change "${disturb_text} $(translate "Scheduled push task completed")"
-	deltemp
-	rm -f "${dir}/send_pid"
+	[ $RETVAL -ne 0 ] && log_change "[ERROR] $(translate "Scheduled push failed, please check network or settings")" || log_change "${disturb_text} $(translate "Scheduled push task completed")"
+	finish_send
 	return $RETVAL
 }
 

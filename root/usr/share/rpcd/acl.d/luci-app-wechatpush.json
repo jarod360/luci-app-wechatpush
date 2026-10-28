@@ -10,6 +10,7 @@
 				"/usr/libexec/wechatpush-call": [ "exec" ]
 			},
 			"ubus": {
+				"luci.client-rates": [ "get" ],
 				"luci-rpc": [ "getHostHints" ],
 				"service": [ "list" ]
 			},
