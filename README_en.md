@@ -65,7 +65,6 @@ Tested on **TL-R5005P-AC 1.0, firmware 1.0.4 Build 260414**, with **QWRT 25.12.2
 
 ### Other 3.6.20 changes
 
-Revision **r3** isolates each send in a private temporary JSON file to prevent concurrent device/login/scheduled messages from overwriting it or the main loop removing it. WeCom JSON uses ASCII Unicode escapes without changing decoded text. Twelve concurrent 25KB Unicode requests pass the target-QWRT regression with network calls stubbed. The most recent offline title, raw body, payload and timestamp are retained locally in `/tmp/wechatpush/push_diagnostics/` (mode 700), without request URLs or authentication tokens. Only one snapshot is kept; it is overwritten on the next offline notification and lost on reboot.
 
 Fix UTF-8 byte handling on QWRT Bash/musl, exact MAC/IP alias matching and literal percent/quote handling. Prevent stale ARP from undoing a TP-LINK offline decision, reduce unchanged-state writes and prevent dismissed client dialogs from reopening after asynchronous reads. Update WeCom application setup wording and identify image-message logs as `【企业微信图文版】`. For a WeCom API proxy, allow its IP in the application trusted-IP list; for a forward proxy, allow its actual public egress IP. Protocol, UI, original/native detector, alias and UTF-8 regressions now run before package builds and releases.
 
@@ -101,7 +100,7 @@ To install a package built by this repository's GitHub Actions, download the mat
 opkg install ./luci-app-wechatpush_3.6.20_all.ipk
 ```
 
-The older SDK records the IPK package version as `3.6.20`. If an earlier revision of that version is already installed, use `opkg --force-reinstall install ./luci-app-wechatpush_3.6.20_all.ipk` for r12 and update the matching language package. APK builds carry the separate `-r12` revision.
+The older SDK records the IPK package version as `3.6.20`. If an earlier revision of that version is already installed, use `opkg --force-reinstall install ./luci-app-wechatpush_3.6.20_all.ipk` for r13 and update the matching language package. APK builds carry the separate `-r13` revision.
 
 Optional dependencies:
 
@@ -164,8 +163,9 @@ Bash 5.1.4 on the target QWRT reproduced corruption when a UTF-8 character cross
 
 WeChatPush preserves the original language choice before setting its own process environment to `LC_ALL=C`; Lua/JSON still handle Unicode. This does not replace system Bash or change global language settings. Background outputs use literal variable assignment instead of re-evaluating content as shell code.
 
-The latest scheduled raw client list, assembled body, encoded payload, title and timestamp are retained separately in `/tmp/wechatpush/scheduled_diagnostics/`. Offline diagnostics remain in `push_diagnostics/`. Snapshots overwrite prior data, contain no request URL/auth token, use directory mode 700/file mode 600 and disappear on reboot. A raw client-list file is produced only when one is present.
 
 ### Notification cover update (r12)
 
 The default cover is the approved Chinese real-time alert artwork, 1068×455 and about 29.7 KB, with no visible watermark. Only `logo.jpg` is packaged; custom image paths retain their configured values. Size guidance distinguishes the news recommendation (1068×455 large, 150×150 small) from the mpnews channel used here and advises keeping essential content centered with cropping margins.
+
+Revision **r13** removes scheduled/offline diagnostic snapshots, retaining UTF-8 fixes, concurrency isolation and lightweight replacement-character warnings.
